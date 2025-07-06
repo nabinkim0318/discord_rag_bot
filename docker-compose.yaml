@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: discord-rag-backend
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+      - ./rag_agent:/app/rag_agent
+    ports:
+      - "8000:8000"
+    command: poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - rag_agent
+
+  rag_agent:
+    build:
+      context: ./rag_agent
+      dockerfile: Dockerfile
+    container_name: discord-rag-agent
+    volumes:
+      - ./rag_agent:/app
+    command: ["sleep", "infinity"]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: discord-rag-frontend
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_BACKEND_API_URL=http://localhost:8000/api/v1
+    command: npm run dev
+    depends_on:
+      - backend
+
+networks:
+  default:
+    driver: bridge

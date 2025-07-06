@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "rag_agent"
+version = "0.1.0"
+description = "RAG pipeline for Discord RAG Bot"
+authors = ["Nabin Kim <nabinkim0318@gmail.com>"]
+packages = [{ include = "rag_agent" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+numpy = "^1.26.0"
+scikit-learn = "^1.5.0"
+faiss-cpu = "^1.8.0"
+sentence-transformers = "^2.7.0"
+requests = "^2.32.0"
+openai = "^1.30.1"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.4.2"
+isort = "^5.13.2"
+flake8 = "^7.0.0"
+pre-commit = "^3.7.0"
+pytest = "^8.2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
