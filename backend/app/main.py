@@ -2,6 +2,7 @@ from time import time
 from uuid import uuid4
 
 from app.api.v1 import feedback, rag
+from app.core.config import settings
 from app.core.logging import logger
 from app.core.metrics import instrumentator
 from fastapi import FastAPI, Request
@@ -9,7 +10,7 @@ from fastapi import FastAPI, Request
 # Logging
 logger.info("App starting...")
 
-app = FastAPI(title="RAG API")
+app = FastAPI(title=settings.APP_NAME)
 app.include_router(rag.router)
 app.include_router(feedback.router)
 
