@@ -17,6 +17,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: .
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -47,6 +49,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: .
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -77,6 +81,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: .
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -92,4 +98,4 @@ jobs:
           npx eslint . --ext .js,.ts,.tsx || true  # optional: remove '|| true' to fail on lint errors
 
       - name: Run Tests (Frontend)
-        run: npm run test --if-present  # if you add frontend tests later
+        run: npm run test --if-present # if you add frontend tests later
