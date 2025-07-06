@@ -1,5 +1,6 @@
 from typing import Annotated, List, Optional
 
+from app.core.config import settings
 from pydantic import BaseModel, Field
 
 # ==================== Pydantic Models ====================
@@ -8,7 +9,8 @@ from pydantic import BaseModel, Field
 class RAGQueryRequest(BaseModel):
     query: str = Field(..., description="question text")
     top_k: Optional[Annotated[int, Field(ge=1)]] = Field(
-        5, description="number of documents to retrieve (default 5)"
+        settings.DEFAULT_TOP_K,
+        description="number of documents to retrieve (default 5)",
     )
     use_streaming: Optional[bool] = Field(False, description="streaming response")
 
