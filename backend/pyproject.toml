@@ -13,6 +13,8 @@ pydantic = "^2.7.1"
 httpx = "^0.27.0"
 loguru = "^0.7.2"
 requests = "^2.32.0"
+prometheus-client = "^0.22.1"
+prometheus-fastapi-instrumentator = "^7.1.0"
 rag_agent = { path = "../rag_agent", develop = true }
 
 [tool.poetry.group.dev.dependencies]
@@ -21,6 +23,8 @@ isort = "^5.13.2"
 flake8 = "^7.0.0"
 pre-commit = "^3.7.0"
 pytest = "^8.2.0"
+pytest-asyncio = "^0.24.0"
+httpx = "^0.27.0"
 
 [build-system]
 requires = ["poetry-core"]
