@@ -1,18 +1,18 @@
 # backend/app/core/logging.py
 
 import sys
-from pathlib import Path
 
+from app.core.config import settings
 from loguru import logger
 
-LOG_DIR = Path(__file__).resolve().parent.parent.parent / "logs"
+LOG_DIR = settings.LOG_DIR
 LOG_DIR.mkdir(parents=True, exist_ok=True)  # create logs directory
 
 # default logging settings
 logger.remove()  # remove default handler (disable FastAPI default logger)
 logger.add(
     sys.stdout,
-    level="INFO",
+    level=settings.LOG_LEVEL,
     enqueue=True,
     colorize=True,
     format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
@@ -24,9 +24,9 @@ logger.add(
 # file logging (INFO and above)
 logger.add(
     LOG_DIR / "app.log",
-    rotation="10 MB",
-    retention="7 days",
-    level="INFO",
+    rotation=settings.LOG_ROTATION,
+    retention=settings.LOG_RETENTION,
+    level=settings.LOG_LEVEL,
     enqueue=True,
     format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}",
 )
