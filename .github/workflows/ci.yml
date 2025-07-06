@@ -1,0 +1,95 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  backend:
+    name: Backend (FastAPI + rag_agent)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3
+        with:
+          poetry-version: "1.8.2"
+
+      - name: Install dependencies (Backend)
+        run: poetry install
+
+      - name: Run Pre-commit (Backend)
+        run: poetry run pre-commit run --all-files
+
+      - name: Run Tests (Backend)
+        run: poetry run pytest
+
+  rag_agent:
+    name: RAG Agent Pipeline
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: rag_agent
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3
+        with:
+          poetry-version: "1.8.2"
+
+      - name: Install dependencies (RAG Agent)
+        run: poetry install
+
+      - name: Run Pre-commit (RAG Agent)
+        run: poetry run pre-commit run --all-files
+
+      - name: Run Tests (RAG Agent)
+        run: poetry run pytest
+
+  frontend:
+    name: Frontend (React/Next.js)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies (Frontend)
+        run: npm install
+
+      - name: Run Prettier & Lint (Frontend)
+        run: |
+          npx prettier --check .
+          npx eslint . --ext .js,.ts,.tsx || true  # optional: remove '|| true' to fail on lint errors
+
+      - name: Run Tests (Frontend)
+        run: npm run test --if-present  # if you add frontend tests later

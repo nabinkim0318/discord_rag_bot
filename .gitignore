@@ -1,0 +1,80 @@
+# ========================
+# Common (Global)
+# ========================
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+*.log
+*.DS_Store
+.env
+.env.*
+venv/
+.venv/
+.cache/
+dist/
+build/
+coverage/
+*.sqlite3
+*.db
+
+# ========================
+# Python Specific (backend, rag_agent)
+# ========================
+/backend/.mypy_cache/
+/backend/.pytest_cache/
+/rag_agent/.mypy_cache/
+/rag_agent/.pytest_cache/
+.ipynb_checkpoints/
+logs/              # log directory (loguru)
+
+# Ignore compiled Python files
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+# ========================
+# Node.js Specific (frontend, discord-bot if any)
+# ========================
+/frontend/node_modules/
+/frontend/.next/
+/frontend/.vercel/
+/frontend/.env.local
+/frontend/.env.development.local
+/frontend/.env.test.local
+/frontend/.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ========================
+# Docker & Containers
+# ========================
+/**/.docker-compose.override.yml
+**/Dockerfile.*
+.dockerignore
+
+# ========================
+# IDEs / Editors
+# ========================
+.vscode/
+.idea/
+*.swp
+*.bak
+*.tmp
+
+# ========================
+# OS files
+# ========================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ========================
+# Custom folders (optional)
+# ========================
+/data/              # rag_agent experiment data (optional)
+/scripts/__pycache__/
+/scripts/*.pyc

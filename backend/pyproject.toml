@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "discord-rag-backend"
+version = "0.1.0"
+description = "FastAPI backend for Discord RAG Bot"
+authors = ["Nabin Kim <nabinkim0318@gmail.com>"]
+packages = [{ include = "app" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.110.0"
+uvicorn = { extras = ["standard"], version = "^0.29.0" }
+pydantic = "^2.7.1"
+httpx = "^0.27.0"
+loguru = "^0.7.2"
+requests = "^2.32.0"
+rag_agent = { path = "../rag_agent", develop = true }
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.4.2"
+isort = "^5.13.2"
+flake8 = "^7.0.0"
+pre-commit = "^3.7.0"
+pytest = "^8.2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
