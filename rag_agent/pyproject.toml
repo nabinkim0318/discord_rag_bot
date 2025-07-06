@@ -3,14 +3,20 @@ name = "rag_agent"
 version = "0.1.0"
 description = "RAG pipeline for Discord RAG Bot"
 authors = ["Nabin Kim <nabinkim0318@gmail.com>"]
-packages = [{ include = "rag_agent" }]
+packages = [
+    { include = "generation" },
+    { include = "evaluation" },
+    { include = "retrieval" },
+    { include = "ingestion" },
+    { include = "tests" }
+]
+
 
 [tool.poetry.dependencies]
 python = "^3.11"
 numpy = "^1.26.0"
 scikit-learn = "^1.5.0"
 faiss-cpu = "^1.8.0"
-sentence-transformers = "^2.7.0"
 requests = "^2.32.0"
 openai = "^1.30.1"
 
