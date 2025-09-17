@@ -15,7 +15,7 @@ export default function LoadingMessage() {
               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
             </div>
-            <span className="text-sm text-gray-600">답변을 생성하고 있습니다...</span>
+            <span className="text-sm text-gray-600">Generating answer...</span>
           </div>
         </div>
       </div>
