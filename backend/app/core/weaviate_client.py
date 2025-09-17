@@ -66,8 +66,11 @@ class WeaviateClient:
                 "vectorizer": "text2vec-openai",  # Use OpenAI embeddings
                 "moduleConfig": {
                     "text2vec-openai": {
-                        "model": "ada",
-                        "modelVersion": "002",
+                        # 최신 OpenAI 임베딩을 쓸 거면:
+                        # "model": "text-embedding-3-small",  # 또는 3-large
+                        # "type": "text",
+                        # 구버전(ada-002)을 쓸 거면 기존 그대로 두되 실제 계정에서 지원 확인
+                        "model": "text-embedding-3-small",
                         "type": "text",
                     }
                 },
@@ -83,8 +86,8 @@ class WeaviateClient:
                         "description": "Document source",
                     },
                     {
-                        "name": "metadata",
-                        "dataType": ["object"],
+                        "name": "metadata_json",
+                        "dataType": ["text"],
                         "description": "Additional metadata",
                     },
                     {
@@ -95,7 +98,7 @@ class WeaviateClient:
                     {
                         "name": "created_at",
                         "dataType": ["date"],
-                        "description": "Creation timestamp",
+                        "description": "Creation time",
                     },
                 ],
             }
@@ -128,13 +131,23 @@ class WeaviateClient:
                 "created_at": datetime.utcnow().isoformat(),
             }
 
+            # add_document
             result = self.client.data_object.create(
                 data_object=document_data, class_name=self.class_name
             )
+            document_id = (
+                result if isinstance(result, str) else document_data.get("query_id", "")
+            )
 
-            document_id = result["id"]
+            # document_id = result["id"]
             logger.info(f"Added document to Weaviate with ID: {document_id}")
             return document_id
+
+        except weaviate.UnexpectedStatusCodeException as e:
+            logger.error(f"Failed to add document to Weaviate: {str(e)}")
+            raise ExternalServiceException(
+                f"Failed to add document to Weaviate: {str(e)}", service_name="weaviate"
+            )
 
         except Exception as e:
             logger.error(f"Failed to add document to Weaviate: {str(e)}")

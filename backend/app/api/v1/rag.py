@@ -11,7 +11,7 @@ from app.services.rag_service import run_rag_pipeline
 router = APIRouter(prefix="/api/v1/rag", tags=["RAG"])
 
 
-@router.post("/", response_model=RAGQueryResponse, status_code=500)
+@router.post("/", response_model=RAGQueryResponse)
 async def query_rag(request: RAGQueryRequest):
     try:
         answer, contexts, metadata = run_rag_pipeline(request.query)

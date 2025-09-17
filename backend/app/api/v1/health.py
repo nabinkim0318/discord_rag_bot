@@ -1,6 +1,7 @@
 from time import perf_counter
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlmodel import Session
 
 from app.core.metrics import (
     health_check_counter,
@@ -14,6 +15,7 @@ from app.core.metrics import (
     health_check_vector_store_failures,
     health_check_vector_store_latency,
 )
+from app.db.session import get_session
 
 router = APIRouter()
 
@@ -33,10 +35,11 @@ async def health_check():
 
 
 @router.get("/db", tags=["Health"])
-async def health_check_db():
+async def health_check_db(session: Session = Depends(get_session)):
     start = perf_counter()
     try:
         # actual DB ping or query execution example: await db.execute("SELECT 1")
+        session.exec("SELECT 1")  # actual ping
         duration = perf_counter() - start
         health_check_db_counter.labels(status="success").inc()
         health_check_db_latency.observe(duration)
