@@ -1,7 +1,9 @@
+# app/models/rag.py
 from typing import Annotated, List, Optional
 
-from app.core.config import settings
 from pydantic import BaseModel, Field
+
+from app.core.config import settings
 
 # ==================== Pydantic Models ====================
 
@@ -31,5 +33,5 @@ class PipelineMetadata(BaseModel):
 
 class RAGQueryResponse(BaseModel):
     answer: str
-    contexts: List[RetrievedContext]
-    metadata: PipelineMetadata
+    contexts: List[str]  # Simplified: list of strings
+    metadata: dict  # Simplified: dictionary

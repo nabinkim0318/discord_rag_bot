@@ -16,6 +16,10 @@ requests = "^2.32.0"
 prometheus-client = "^0.22.1"
 prometheus-fastapi-instrumentator = "^7.1.0"
 rag_agent = { path = "../rag_agent", develop = true }
+sqlmodel = "^0.0.24"
+alembic = "^1.16.5"
+weaviate-client = "^4.0.0"
+openai = "^1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.4.2"
@@ -25,6 +29,31 @@ pre-commit = "^3.7.0"
 pytest = "^8.2.0"
 pytest-asyncio = "^0.24.0"
 httpx = "^0.27.0"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["app"]
+known_third_party = ["fastapi", "pydantic", "sqlmodel", "loguru", "weaviate"]
 
 [build-system]
 requires = ["poetry-core"]
