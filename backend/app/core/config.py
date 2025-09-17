@@ -1,3 +1,4 @@
+# app/core/config.py
 """
 Configuration settings for the RAG Backend API
 """
@@ -36,6 +37,12 @@ class Settings(BaseModel):
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-4"
     OPENAI_MAX_TOKENS: int = 1000
+
+    # ==================== Weaviate Settings ====================
+    WEAVIATE_URL: str = "http://localhost:8080"
+    WEAVIATE_API_KEY: Optional[str] = None
+    WEAVIATE_CLASS_NAME: str = "RAGDocument"
+    WEAVIATE_BATCH_SIZE: int = 100
 
     # ==================== Database Settings ====================
     DATABASE_URL: Optional[str] = None
