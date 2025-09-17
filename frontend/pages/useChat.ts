@@ -2,7 +2,9 @@
 import { useState } from "react";
 
 export function useChat() {
-  const [messages, setMessages] = useState<{ role: "user" | "bot"; message: string }[]>([]);
+  const [messages, setMessages] = useState<
+    { role: "user" | "bot"; message: string }[]
+  >([]);
   const [loading, setLoading] = useState(false);
 
   const sendMessage = async (prompt: string) => {
@@ -19,8 +21,7 @@ export function useChat() {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
-          errorData?.error ||
-          `server error (${response.status})`
+          errorData?.error || `server error (${response.status})`,
         );
       }
 
@@ -28,9 +29,8 @@ export function useChat() {
       setMessages((prev) => [...prev, { role: "bot", message: data.response }]);
     } catch (err) {
       console.error("Chat error:", err);
-      const errorMessage = err instanceof Error
-        ? `⚠️ ${err.message}`
-        : "⚠️ network error. please try again later.";
+      const errorMessage =
+        "⚠️ I can't answer your question right now. Please try again later.";
       setMessages((prev) => [...prev, { role: "bot", message: errorMessage }]);
     } finally {
       setLoading(false);
