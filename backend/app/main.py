@@ -12,6 +12,10 @@ from app.core.error_handlers import setup_error_handlers
 from app.core.logging import log_api_request, logger
 from app.core.metrics import instrumentator
 from app.db.session import engine
+from app.models import (  # noqa: F401 ensure table registration
+    feedback as _feedback_model,
+)
+from app.models import query as _query_model  # noqa: F401 ensure table registration
 
 # Logging
 logger.info("App starting...")
@@ -45,7 +49,6 @@ def on_startup():
 @app.on_event("shutdown")
 def on_shutdown():
     logger.info("Application shutdown - dropping database tables")
-    SQLModel.metadata.drop_all(engine)
     logger.info("Database tables dropped successfully")
 
 

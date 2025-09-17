@@ -1,10 +1,12 @@
 # app/api/query.py
+from time import perf_counter
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from app.core.logging import logger
+from app.core.metrics import rag_query_counter, rag_query_latency
 from app.db.session import get_session
 from app.models.query import Query
 from app.models.rag import RAGQueryRequest, RAGQueryResponse
@@ -18,6 +20,7 @@ async def query_rag(request: RAGQueryRequest, session: Session = Depends(get_ses
     """
     RAG query processing and database storage
     """
+    start = perf_counter()
     try:
         logger.info(f"Processing RAG query: {request.query}")
 
@@ -44,21 +47,15 @@ async def query_rag(request: RAGQueryRequest, session: Session = Depends(get_ses
         logger.info(f"Query saved to database with ID: {query_record.id}")
 
         # Store RAG result in Weaviate with query_id
-        from app.services.rag_service import _store_rag_result_in_weaviate
-
-        _store_rag_result_in_weaviate(
-            query=request.query,
-            answer=answer,
-            contexts=contexts,
-            metadata=metadata,
-            query_id=query_record.id,
-        )
+        dur = perf_counter() - start
+        rag_query_counter.labels(method="POST", endpoint="/api/query/").inc()
+        rag_query_latency.labels(endpoint="/api/query/").observe(dur)
 
         return {
             "answer": answer,
             "contexts": contexts,
             "metadata": metadata,
-            "query_id": query_record.id,  # Added: return saved query ID
+            "query_id": query_record.id,
         }
 
     except Exception as e:
