@@ -8,7 +8,7 @@ on:
 
 jobs:
   backend:
-    name: Backend (FastAPI + rag_agent)
+    name: Backend (FastAPI)
     runs-on: ubuntu-latest
 
     defaults:
