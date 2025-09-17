@@ -17,8 +17,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: .
 
       - name: Set Git to use LF line endings (backend)
         run: git config --global core.autocrlf input
@@ -26,15 +24,15 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install Poetry
         uses: abatilo/actions-poetry@v3
         with:
-          poetry-version: "1.8.2"
+          poetry-version: "2.0.0"
 
       - name: Install dependencies (Backend)
-        run: poetry install
+        run: poetry install --no-root
 
       - name: Run Pre-commit (Backend)
         run: poetry run pre-commit run --all-files
@@ -52,8 +50,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: .
 
       - name: Set Git to use LF line endings (rag_agent)
         run: git config --global core.autocrlf input
@@ -61,15 +57,15 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install Poetry
         uses: abatilo/actions-poetry@v3
         with:
-          poetry-version: "1.8.2"
+          poetry-version: "2.0.0"
 
       - name: Install dependencies (RAG Agent)
-        run: poetry install
+        run: poetry install --no-root
 
       - name: Run Pre-commit (RAG Agent)
         run: poetry run pre-commit run --all-files
@@ -87,8 +83,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: .
 
       - name: Set Git to use LF line endings (frontend)
         run: git config --global core.autocrlf input
