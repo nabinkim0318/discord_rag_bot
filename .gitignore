@@ -24,6 +24,8 @@ coverage/
 /backend/.mypy_cache/
 /backend/.pytest_cache/
 /rag_agent/.mypy_cache/
+/backend/.env
+/rag_agent/.env
 /rag_agent/.pytest_cache/
 .ipynb_checkpoints/
 logs/              # log directory (loguru)
@@ -78,5 +80,6 @@ Desktop.ini
 /data/              # rag_agent experiment data (optional)
 /scripts/__pycache__/
 /scripts/*.pyc
+.env
 .env
 .env
