@@ -1,28 +1,41 @@
 # app/models/feedback.py
-import uuid
 from datetime import datetime
-from typing import Literal, Optional
+from enum import Enum
+from typing import Optional
+from uuid import uuid4
 
 from pydantic import BaseModel
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, UniqueConstraint
 
 
-class FeedbackRequest(BaseModel):
-    query_id: str = Field(..., description="ID of the query being feedback on")
-    feedback_type: Literal["like", "dislike", "report", "improvement"] = Field(
-        ..., description="feedback type"
-    )
-    comment: Optional[str] = Field(None, description="additional comment (optional)")
-
-
-class FeedbackResponse(BaseModel):
-    status: str = Field(..., description="feedback processing status ('success' etc.)")
-    message: Optional[str] = Field(None, description="additional message")
+class FeedbackType(str, Enum):
+    up = "up"
+    down = "down"
 
 
 class Feedback(SQLModel, table=True):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    query_id: str
-    feedback: str
+    __tablename__ = "feedback"
+    __table_args__ = (
+        UniqueConstraint("query_id", "user_id", name="uq_feedback_query_user"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True, index=True)
+    query_id: str = Field(foreign_key="queries.id", index=True)
+    user_id: str = Field(index=True)
+    feedback: FeedbackType  # enum-backed column
     comment: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# request/response schema (already used form)
+
+
+class FeedbackRequest(BaseModel):
+    query_id: str
+    feedback_type: FeedbackType  # API input is feedback_type
+
+
+class FeedbackResponse(BaseModel):
+    status: str
+    message: str
+    feedback_id: str

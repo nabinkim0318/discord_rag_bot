@@ -1,4 +1,5 @@
 # app/db/session.py
+import os
 import time
 from contextlib import contextmanager
 from typing import Generator
@@ -7,12 +8,13 @@ from sqlmodel import Session, create_engine
 
 from app.core.logging import log_database_operation, logger
 
-DATABASE_URL = "sqlite:///./db.sqlite3"  # or postgres://...
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./db.sqlite3")
 engine = create_engine(
     DATABASE_URL,
     echo=False,  # SQL query logging (only True for development)
     pool_pre_ping=True,  # Check connection status
     pool_recycle=300,  # Recreate connection every 5 minutes
+    connect_args={"check_same_thread": False},
 )
 
 

@@ -92,10 +92,13 @@ health_check_vector_store_latency = create_histogram(
 
 def rag_query_metric(info):
     """RAG endpoint tracking logic"""
-    path = info.scope.get("path", "")
+    path = getattr(info, "modified_path", None) or getattr(info, "path", "")
+    method = getattr(info, "method", "")
+    duration = getattr(info, "duration", getattr(info, "latency", 0.0))
+
     if path in ["/api/v1/rag/", "/api/query/"]:
-        rag_query_counter.labels(method=info.method, endpoint=path).inc()
-        rag_query_latency.labels(endpoint=path).observe(info.duration)
+        rag_query_counter.labels(method=method, endpoint=path).inc()
+        rag_query_latency.labels(endpoint=path).observe(duration)
 
 
 def record_feedback_metric(feedback_type: str):

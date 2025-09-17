@@ -1,6 +1,6 @@
 # ======== Project Setup ========
 
-.PHONY: install-backend install-rag setup-backend setup-rag clean lint-backend lint-rag format-backend format-rag test-backend test-rag run-backend run-rag lock-backend lock-rag update-backend update-rag check-backend check-rag precommit-backend precommit-rag commit
+.PHONY: install-backend install-rag backend-setup rag-setup clean lint-backend lint-rag format-backend format-rag test-backend test-rag run-backend run-rag lock-backend lock-rag update-backend update-rag check-backend check-rag precommit-backend precommit-rag commit
 
 # ==== Install Dependencies ====
 install: install-backend install-rag
@@ -13,12 +13,12 @@ install-rag:
 	cd rag_agent && poetry install || true
 	cd rag_agent && poetry run pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-setup: setup-backend setup-rag
+setup: backend-setup rag-setup
 
-setup-backend:
+backend-setup:
 	cd backend && poetry shell
 
-setup-rag:
+rag-setup:
 	cd rag_agent && poetry shell
 
 # ======== Development ========
@@ -62,7 +62,15 @@ run-rag:
 
 # ======== Maintenance ========
 
-clean:
+clean-backend:
+	cd backend && poetry run find . -type d -name "__pycache__" -exec rm -r {} +
+	cd backend && rm -rf .pytest_cache .ruff_cache .mypy_cache
+
+clean-rag:
+	cd rag_agent && poetry run find . -type d -name "__pycache__" -exec rm -r {} +
+	cd rag_agent && rm -rf .pytest_cache .ruff_cache .mypy_cache
+
+clean: clean-backend clean-rag
 	find . -type d -name "__pycache__" -exec rm -r {} +
 	rm -rf .pytest_cache .ruff_cache .mypy_cache
 

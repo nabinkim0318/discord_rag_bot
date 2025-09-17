@@ -3,6 +3,7 @@ from time import time
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel
 
 from app.api import query
@@ -28,6 +29,15 @@ app = FastAPI(
 
 # Setup error handlers
 setup_error_handlers(app)
+
+# Setup CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Register routers
 app.include_router(rag.router)
@@ -60,8 +70,8 @@ async def log_requests(request: Request, call_next):
 
     # Request start logging
     logger.info(
-        f"[{request_id}] Request started: {request.method} {request.url.path} \
-        | User: {user_id}"
+        f"[{request_id}] Request started: {request.method} {request.url.path} | "
+        f"User: {user_id}"
     )
 
     try:
@@ -83,8 +93,7 @@ async def log_requests(request: Request, call_next):
     except Exception as e:
         duration = time() - start_time
         logger.error(
-            f"[{request_id}] Request failed: {request.method} {request.url.path} \
-            | "
+            f"[{request_id}] Request failed: {request.method} {request.url.path} | "
             f"User: {user_id} | Duration: {duration:.3f}s | Error: {str(e)}"
         )
         raise
