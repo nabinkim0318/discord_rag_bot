@@ -3,6 +3,7 @@
 Weaviate vector database client
 """
 
+import json
 from typing import Any, Dict, List, Optional
 
 import weaviate
@@ -52,24 +53,17 @@ class WeaviateClient:
             )
 
     def _setup_schema(self):
-        """Setup Weaviate schema for RAG documents"""
         try:
-            # Check if class already exists
             if self.client.schema.exists(self.class_name):
                 logger.info(f"Weaviate class '{self.class_name}' already exists")
                 return
 
-            # Create class schema
             class_schema = {
                 "class": self.class_name,
                 "description": "RAG documents for retrieval",
-                "vectorizer": "text2vec-openai",  # Use OpenAI embeddings
+                "vectorizer": "text2vec-openai",
                 "moduleConfig": {
                     "text2vec-openai": {
-                        # 최신 OpenAI 임베딩을 쓸 거면:
-                        # "model": "text-embedding-3-small",  # 또는 3-large
-                        # "type": "text",
-                        # 구버전(ada-002)을 쓸 거면 기존 그대로 두되 실제 계정에서 지원 확인
                         "model": "text-embedding-3-small",
                         "type": "text",
                     }
@@ -88,7 +82,7 @@ class WeaviateClient:
                     {
                         "name": "metadata_json",
                         "dataType": ["text"],
-                        "description": "Additional metadata",
+                        "description": "JSON-serialized metadata",
                     },
                     {
                         "name": "query_id",
@@ -102,10 +96,8 @@ class WeaviateClient:
                     },
                 ],
             }
-
             self.client.schema.create_class(class_schema)
             logger.info(f"Created Weaviate class '{self.class_name}'")
-
         except Exception as e:
             logger.error(f"Failed to setup Weaviate schema: {str(e)}")
             raise ExternalServiceException(
@@ -119,36 +111,21 @@ class WeaviateClient:
         metadata: Dict[str, Any],
         query_id: Optional[str] = None,
     ) -> str:
-        """Add a document to Weaviate"""
         try:
             from datetime import datetime
 
             document_data = {
                 "content": content,
                 "source": source,
-                "metadata": metadata,
+                "metadata_json": json.dumps(metadata, ensure_ascii=False),
                 "query_id": query_id or "",
                 "created_at": datetime.utcnow().isoformat(),
             }
-
-            # add_document
-            result = self.client.data_object.create(
+            doc_uuid = self.client.data_object.create(
                 data_object=document_data, class_name=self.class_name
             )
-            document_id = (
-                result if isinstance(result, str) else document_data.get("query_id", "")
-            )
-
-            # document_id = result["id"]
-            logger.info(f"Added document to Weaviate with ID: {document_id}")
-            return document_id
-
-        except weaviate.UnexpectedStatusCodeException as e:
-            logger.error(f"Failed to add document to Weaviate: {str(e)}")
-            raise ExternalServiceException(
-                f"Failed to add document to Weaviate: {str(e)}", service_name="weaviate"
-            )
-
+            logger.info(f"Added document to Weaviate with ID: {doc_uuid}")
+            return doc_uuid
         except Exception as e:
             logger.error(f"Failed to add document to Weaviate: {str(e)}")
             raise ExternalServiceException(
@@ -158,47 +135,45 @@ class WeaviateClient:
     def search_similar(
         self, query: str, top_k: int = 5, where_filter: Optional[Dict] = None
     ) -> List[Dict[str, Any]]:
-        """Search for similar documents"""
         try:
-            # Build query
             query_builder = (
                 self.client.query.get(
                     self.class_name,
-                    ["content", "source", "metadata", "query_id", "created_at"],
+                    ["content", "source", "metadata_json", "query_id", "created_at"],
                 )
                 .with_near_text({"concepts": [query]})
                 .with_limit(top_k)
-                .with_additional(["certainty", "distance"])
+                .with_additional(["id", "certainty", "distance"])
             )
-
-            # Add where filter if provided
             if where_filter:
                 query_builder = query_builder.with_where(where_filter)
 
             result = query_builder.do()
-
-            # Process results
             documents = []
             if "data" in result and "Get" in result["data"]:
                 for item in result["data"]["Get"][self.class_name]:
+                    md = {}
+                    try:
+                        md = json.loads(item.get("metadata_json") or "{}")
+                    except Exception:
+                        md = {}
+
                     documents.append(
                         {
                             "id": item["_additional"]["id"],
                             "content": item["content"],
                             "source": item["source"],
-                            "metadata": item["metadata"],
-                            "query_id": item["query_id"],
-                            "created_at": item["created_at"],
+                            "metadata": md,
+                            "query_id": item.get("query_id"),
+                            "created_at": item.get("created_at"),
                             "certainty": item["_additional"]["certainty"],
                             "distance": item["_additional"]["distance"],
                         }
                     )
-
             logger.info(
                 f"Found {len(documents)} similar documents for query: '{query[:50]}...'"
             )
             return documents
-
         except Exception as e:
             logger.error(f"Failed to search Weaviate: {str(e)}")
             raise ExternalServiceException(
