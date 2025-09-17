@@ -78,3 +78,5 @@ Desktop.ini
 /data/              # rag_agent experiment data (optional)
 /scripts/__pycache__/
 /scripts/*.pyc
+.env
+.env
