@@ -41,7 +41,9 @@ export default function ChatPage() {
       {/* Chat Header */}
       <div className="bg-blue-600 text-white p-4 rounded-t-lg">
         <h2 className="text-xl font-semibold">🤖 RAG Chat Assistant</h2>
-        <p className="text-blue-100 text-sm">Enter your question and I'll answer based on the related documents.</p>
+        <p className="text-blue-100 text-sm">
+          Enter your question and I'll answer based on the related documents.
+        </p>
       </div>
 
       {/* Messages Area */}

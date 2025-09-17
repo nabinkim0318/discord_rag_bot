@@ -8,7 +8,9 @@ type Props = {
 
 export default function ChatMessage({ role, message }: Props) {
   return (
-    <div className={`flex ${role === "user" ? "justify-end" : "justify-start"}`}>
+    <div
+      className={`flex ${role === "user" ? "justify-end" : "justify-start"}`}
+    >
       <div className="flex items-start gap-2 max-w-3xl">
         {role === "bot" && (
           <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
@@ -22,9 +24,7 @@ export default function ChatMessage({ role, message }: Props) {
               : "bg-gray-100 text-gray-800 rounded-bl-md"
           }`}
         >
-          <div className="whitespace-pre-wrap break-words">
-            {message}
-          </div>
+          <div className="whitespace-pre-wrap break-words">{message}</div>
         </div>
         {role === "user" && (
           <div className="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
