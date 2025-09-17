@@ -1,13 +1,13 @@
 # app/core/exceptions.py
 """
-커스텀 예외 클래스들
+Custom exception classes
 """
 
 from typing import Any, Dict, Optional
 
 
 class RAGException(Exception):
-    """RAG 파이프라인 관련 예외"""
+    """RAG pipeline related exception"""
 
     def __init__(
         self,
@@ -22,7 +22,7 @@ class RAGException(Exception):
 
 
 class DatabaseException(Exception):
-    """데이터베이스 관련 예외"""
+    """Database related exception"""
 
     def __init__(
         self,
@@ -37,7 +37,7 @@ class DatabaseException(Exception):
 
 
 class ValidationException(Exception):
-    """입력 검증 관련 예외"""
+    """Input validation related exception"""
 
     def __init__(
         self,
@@ -52,7 +52,7 @@ class ValidationException(Exception):
 
 
 class ExternalServiceException(Exception):
-    """외부 서비스 호출 관련 예외"""
+    """External service call related exception"""
 
     def __init__(
         self,

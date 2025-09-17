@@ -10,20 +10,28 @@ export function useChat() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/v1/rag", {
+      const response = await fetch("/api/query", {
         method: "POST",
-        body: JSON.stringify({ prompt: prompt  }),
+        body: JSON.stringify({ prompt: prompt }),
         headers: { "Content-Type": "application/json" },
       });
 
-      const data = await response.json();
       if (!response.ok) {
-        throw new Error(data?.error || "Something went wrong");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData?.error ||
+          `server error (${response.status})`
+        );
       }
 
+      const data = await response.json();
       setMessages((prev) => [...prev, { role: "bot", message: data.response }]);
     } catch (err) {
-      setMessages((prev) => [...prev, { role: "bot", message: "⚠️ Failed to get response." }]);
+      console.error("Chat error:", err);
+      const errorMessage = err instanceof Error
+        ? `⚠️ ${err.message}`
+        : "⚠️ network error. please try again later.";
+      setMessages((prev) => [...prev, { role: "bot", message: errorMessage }]);
     } finally {
       setLoading(false);
     }

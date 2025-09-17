@@ -16,15 +16,15 @@ router = APIRouter()
 @router.post("/", response_model=RAGQueryResponse)
 async def query_rag(request: RAGQueryRequest, session: Session = Depends(get_session)):
     """
-    RAG 쿼리 처리 및 데이터베이스 저장
+    RAG query processing and database storage
     """
     try:
         logger.info(f"Processing RAG query: {request.query}")
 
-        # RAG 파이프라인 실행
+        # Run RAG pipeline
         answer, contexts, metadata = run_rag_pipeline(request.query, request.top_k or 5)
 
-        # 데이터베이스에 쿼리 결과 저장
+        # Save query result to database
         query_record = Query(
             user_id=request.user_id if hasattr(request, "user_id") else None,
             query=request.query,
@@ -58,7 +58,7 @@ async def query_rag(request: RAGQueryRequest, session: Session = Depends(get_ses
             "answer": answer,
             "contexts": contexts,
             "metadata": metadata,
-            "query_id": query_record.id,  # 추가: 저장된 쿼리 ID 반환
+            "query_id": query_record.id,  # Added: return saved query ID
         }
 
     except Exception as e:
