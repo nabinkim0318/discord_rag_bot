@@ -139,7 +139,7 @@ def run_rag_pipeline(
     start_time = time.time()
 
     try:
-        logger.info(f"Starting RAG pipeline for query: '{query[:50]}...'")
+        logger.info("Starting RAG pipeline for query: '{}'", query[:50])
 
         # Record requested top_k distribution
         record_retriever_topk(top_k)
@@ -240,7 +240,7 @@ Please provide a comprehensive answer based on the context documents above:"""
         # Record pipeline latency metric
         record_rag_pipeline_latency(duration)
 
-        logger.info(f"RAG pipeline completed successfully in {duration:.3f}s")
+        logger.info("RAG pipeline completed successfully in {:.3f}s", duration)
         return answer, context_texts, metadata
 
     except RAGException:
@@ -309,7 +309,7 @@ def _store_rag_result_in_weaviate(
                 query_id=query_id,
             )
 
-            logger.info(f"Stored RAG result in Weaviate with ID: {document_id}")
+            logger.info("Stored RAG result in Weaviate with ID: {}", document_id)
 
         except ImportError as e:
             logger.warning(f"Weaviate client not available for storage: {str(e)}")

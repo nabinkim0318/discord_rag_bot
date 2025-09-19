@@ -51,7 +51,7 @@ class WeaviateClient:
 
             # Test connection
             if self.client.is_ready():
-                logger.info(f"Connected to Weaviate at {settings.WEAVIATE_URL}")
+                logger.info("Connected to Weaviate at {}", settings.WEAVIATE_URL)
                 self._setup_schema()
             else:
                 raise ExternalServiceException(
@@ -67,7 +67,7 @@ class WeaviateClient:
     def _setup_schema(self):
         try:
             if self.client.schema.exists(self.class_name):
-                logger.info(f"Weaviate class '{self.class_name}' already exists")
+                logger.info("Weaviate class '{}' already exists", self.class_name)
                 return
 
             class_schema = {
@@ -109,7 +109,7 @@ class WeaviateClient:
                 ],
             }
             self.client.schema.create_class(class_schema)
-            logger.info(f"Created Weaviate class '{self.class_name}'")
+            logger.info("Created Weaviate class '{}'", self.class_name)
         except Exception as e:
             logger.error(f"Failed to setup Weaviate schema: {str(e)}")
             raise ExternalServiceException(
@@ -136,7 +136,7 @@ class WeaviateClient:
             doc_uuid = self.client.data_object.create(
                 data_object=document_data, class_name=self.class_name
             )
-            logger.info(f"Added document to Weaviate with ID: {doc_uuid}")
+            logger.info("Added document to Weaviate with ID: {}", doc_uuid)
             return doc_uuid
         except Exception as e:
             logger.error(f"Failed to add document to Weaviate: {str(e)}")
@@ -197,7 +197,7 @@ class WeaviateClient:
         """Delete a document from Weaviate"""
         try:
             self.client.data_object.delete(uuid=document_id, class_name=self.class_name)
-            logger.info(f"Deleted document from Weaviate with ID: {document_id}")
+            logger.info("Deleted document from Weaviate with ID: {}", document_id)
             return True
 
         except Exception as e:

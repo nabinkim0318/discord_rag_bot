@@ -11,7 +11,7 @@ LOG_DIR = settings.LOG_DIR
 LOG_DIR.mkdir(parents=True, exist_ok=True)  # create logs directory
 
 # default logging settings
-logger.remove()  # remove default handler (disable FastAPI default logger)
+logger.remove()  # Remove Loguru's default console handler to avoid duplicate logs
 
 # Console logging
 logger.add(

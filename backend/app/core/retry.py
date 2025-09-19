@@ -78,7 +78,7 @@ class CircuitBreaker:
             if time.time() - self.last_failure_time > self.config.recovery_timeout:
                 self.state = CircuitState.HALF_OPEN
                 self.success_count = 0
-                logger.info(f"Circuit breaker '{self.name}' moved to HALF_OPEN")
+                logger.info("Circuit breaker '{}' moved to HALF_OPEN", self.name)
                 return True
             return False
         elif self.state == CircuitState.HALF_OPEN:
@@ -92,7 +92,7 @@ class CircuitBreaker:
             if self.success_count >= 2:  # Require 2 successes to close
                 self.state = CircuitState.CLOSED
                 self.failure_count = 0
-                logger.info(f"Circuit breaker '{self.name}' moved to CLOSED")
+                logger.info("Circuit breaker '{}' moved to CLOSED", self.name)
         elif self.state == CircuitState.CLOSED:
             self.failure_count = 0
 

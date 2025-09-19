@@ -69,7 +69,7 @@ def setup_error_handlers(app: FastAPI) -> None:
 
         # Handle rate limiting
         if exc.status_code == 429:
-            retry_after = int(exc.headers.get("Retry-After", 60))
+            retry_after = int((exc.headers or {}).get("Retry-After", 60))
             error_response = create_rate_limit_error(
                 retry_after=retry_after, request_id=request_id
             )
