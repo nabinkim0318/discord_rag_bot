@@ -111,7 +111,14 @@ def call_llm(prompt: str) -> str:
         raise RAGException(f"LLM call failed: {str(e)}")
 
 
-def run_rag_pipeline(query: str, top_k: int = 5) -> Tuple[str, List[str], Dict]:
+def run_rag_pipeline(
+    query: str,
+    top_k: int = 5,
+    *,
+    user_id: Optional[str] = None,
+    channel_id: Optional[str] = None,
+    request_id: Optional[str] = None,
+) -> Tuple[str, List[str], Dict]:
     """
     Complete RAG pipeline execution
 
@@ -168,6 +175,9 @@ Please provide a comprehensive answer based on the context documents above:"""
             success=True,
             duration=duration,
             contexts_count=len(context_texts),
+            user_id=user_id,
+            channel_id=channel_id,
+            request_id=request_id,
         )
 
         # Record pipeline latency metric
@@ -181,7 +191,14 @@ Please provide a comprehensive answer based on the context documents above:"""
         duration = time.time() - start_time
         # Record pipeline latency even on handled RAGException
         record_rag_pipeline_latency(duration)
-        log_rag_operation(query=query, success=False, duration=duration)
+        log_rag_operation(
+            query=query,
+            success=False,
+            duration=duration,
+            user_id=user_id,
+            channel_id=channel_id,
+            request_id=request_id,
+        )
         raise
 
     except Exception as e:
@@ -190,7 +207,14 @@ Please provide a comprehensive answer based on the context documents above:"""
         logger.error(f"Unexpected error in RAG pipeline: {str(e)}")
         # Record pipeline latency on unexpected error
         record_rag_pipeline_latency(duration)
-        log_rag_operation(query=query, success=False, duration=duration)
+        log_rag_operation(
+            query=query,
+            success=False,
+            duration=duration,
+            user_id=user_id,
+            channel_id=channel_id,
+            request_id=request_id,
+        )
         raise RAGException(f"Unexpected error in RAG pipeline: {str(e)}")
 
 

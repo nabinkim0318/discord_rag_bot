@@ -2,7 +2,7 @@
 from time import perf_counter
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session, select
 
 from app.core.logging import logger
@@ -16,7 +16,11 @@ router = APIRouter()
 
 
 @router.post("/", response_model=RAGQueryResponse)
-async def query_rag(request: RAGQueryRequest, session: Session = Depends(get_session)):
+async def query_rag(
+    request: RAGQueryRequest,
+    session: Session = Depends(get_session),
+    http_request: Request = None,
+):
     """
     RAG query processing and database storage
     """
@@ -24,8 +28,26 @@ async def query_rag(request: RAGQueryRequest, session: Session = Depends(get_ses
     try:
         logger.info(f"Processing RAG query: {request.query}")
 
+        # Extract tracing/user context
+        user_id = None
+        channel_id = None
+        request_id = None
+        try:
+            if http_request is not None:
+                user_id = http_request.headers.get("X-User-ID")
+                channel_id = http_request.headers.get("X-Channel-ID")
+                request_id = http_request.headers.get("X-Request-ID")
+        except Exception:
+            pass
+
         # Run RAG pipeline
-        answer, contexts, metadata = run_rag_pipeline(request.query, request.top_k or 5)
+        answer, contexts, metadata = run_rag_pipeline(
+            request.query,
+            request.top_k or 5,
+            user_id=user_id,
+            channel_id=channel_id,
+            request_id=request_id,
+        )
 
         # Save query result to database
         query_record = Query(
