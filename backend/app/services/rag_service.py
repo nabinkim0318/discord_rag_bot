@@ -223,8 +223,7 @@ Please provide a comprehensive answer based on the context documents above:"""
             **prompt_metadata,
         }
 
-        # 6. Store RAG result in Weaviate
-        _store_rag_result_in_weaviate(query, answer, context_texts, metadata)
+        # 6. Weaviate storage will be handled at API level with actual query_id
 
         # Success logging
         log_rag_operation(
@@ -275,7 +274,7 @@ Please provide a comprehensive answer based on the context documents above:"""
         raise RAGException(f"Unexpected error in RAG pipeline: {str(e)}")
 
 
-def _store_rag_result_in_weaviate(
+def store_rag_result_in_weaviate(
     query: str,
     answer: str,
     contexts: List[str],
