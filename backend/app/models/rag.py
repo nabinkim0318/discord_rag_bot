@@ -15,6 +15,7 @@ class RAGQueryRequest(BaseModel):
         description="number of documents to retrieve (default 5)",
     )
     use_streaming: Optional[bool] = Field(False, description="streaming response")
+    user_id: Optional[str] = Field(None, description="user identifier for tracking")
 
 
 class RetrievedContext(BaseModel):

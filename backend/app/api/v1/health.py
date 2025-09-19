@@ -1,6 +1,7 @@
 from time import perf_counter
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import text
 from sqlmodel import Session
 
 from app.core.metrics import (
@@ -39,7 +40,7 @@ async def health_check_db(session: Session = Depends(get_session)):
     start = perf_counter()
     try:
         # actual DB ping or query execution example: await db.execute("SELECT 1")
-        session.exec("SELECT 1")  # actual ping
+        session.exec(text("SELECT 1"))  # actual ping
         duration = perf_counter() - start
         health_check_db_counter.labels(status="success").inc()
         health_check_db_latency.observe(duration)

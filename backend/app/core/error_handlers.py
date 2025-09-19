@@ -55,7 +55,8 @@ def setup_error_handlers(app: FastAPI) -> None:
         )
 
         logger.warning(
-            f"Validation Error: {exc}",
+            "Validation Error: {}",
+            exc,
             extra={"request_id": request_id, "details": details},
         )
 
@@ -74,7 +75,7 @@ def setup_error_handlers(app: FastAPI) -> None:
             )
             return JSONResponse(
                 status_code=429,
-                content=error_response.dict(),
+                content=error_response.model_dump(),
                 headers={"Retry-After": str(retry_after)},
             )
 
@@ -85,12 +86,14 @@ def setup_error_handlers(app: FastAPI) -> None:
             )
             return JSONResponse(
                 status_code=503,
-                content=error_response.dict(),
+                content=error_response.model_dump(),
                 headers={"Retry-After": "60"},
             )
 
         logger.warning(
-            f"HTTP Error {exc.status_code}: {exc.detail}",
+            "HTTP Error {}: {}",
+            exc.status_code,
+            exc.detail,
             extra={"request_id": request_id},
         )
 
@@ -115,7 +118,8 @@ def setup_error_handlers(app: FastAPI) -> None:
         )
 
         logger.error(
-            f"RAG Error: {exc.message}",
+            "RAG Error: {}",
+            exc.message,
             extra={
                 "error_code": exc.error_code,
                 "details": exc.details,
@@ -135,7 +139,8 @@ def setup_error_handlers(app: FastAPI) -> None:
         )
 
         logger.error(
-            f"Database Error: {exc.message}",
+            "Database Error: {}",
+            exc.message,
             extra={
                 "error_code": exc.error_code,
                 "details": exc.details,
@@ -155,7 +160,8 @@ def setup_error_handlers(app: FastAPI) -> None:
         )
 
         logger.warning(
-            f"Validation Error: {exc.message}",
+            "Validation Error: {}",
+            exc.message,
             extra={
                 "error_code": exc.error_code,
                 "details": exc.details,
@@ -193,7 +199,9 @@ def setup_error_handlers(app: FastAPI) -> None:
             headers = {"Retry-After": "30"}
 
         logger.error(
-            f"External Service Error ({exc.service_name}): {exc.message}",
+            "External Service Error ({}): {}",
+            exc.service_name,
+            exc.message,
             extra={
                 "error_code": exc.error_code,
                 "service": exc.service_name,
@@ -214,7 +222,8 @@ def setup_error_handlers(app: FastAPI) -> None:
         request_id = get_request_id(request)
 
         logger.error(
-            f"Unhandled Error: {str(exc)}",
+            "Unhandled Error: {}",
+            str(exc),
             extra={"exception_type": type(exc).__name__, "request_id": request_id},
         )
 

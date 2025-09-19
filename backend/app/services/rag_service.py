@@ -148,6 +148,19 @@ def run_rag_pipeline(
         docs = search_similar_documents(query, top_k)
         context_texts = [doc["text"] for doc in docs]
 
+        # Add request_id to context for tracing
+        if request_id:
+            logger.debug(
+                "Searching documents for query with request_id: {}",
+                request_id,
+                extra={
+                    "request_id": request_id,
+                    "query": query,
+                    "top_k": top_k,
+                    "contexts_found": len(context_texts),
+                },
+            )
+
         # Record retrieval hit (whether any context was found)
         record_retrieval_hit(len(context_texts) > 0)
 
@@ -182,6 +195,16 @@ Please provide a comprehensive answer based on the context documents above:"""
             prompt_metadata = {"version": "fallback"}
 
         # 4. Call LLM
+        if request_id:
+            logger.debug(
+                "Calling LLM with request_id: {}",
+                request_id,
+                extra={
+                    "request_id": request_id,
+                    "prompt_length": len(prompt),
+                    "contexts_count": len(context_texts),
+                },
+            )
         answer = call_llm(prompt)
 
         # 5. Construct metadata

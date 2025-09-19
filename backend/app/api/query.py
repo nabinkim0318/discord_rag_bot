@@ -26,19 +26,30 @@ async def query_rag(
     """
     start = perf_counter()
     try:
-        logger.info(f"Processing RAG query: {request.query}")
-
         # Extract tracing/user context
-        user_id = None
+        user_id = request.user_id  # Default from request body
         channel_id = None
         request_id = None
         try:
             if http_request is not None:
-                user_id = http_request.headers.get("X-User-ID")
+                # Override with header values if present
+                header_user_id = http_request.headers.get("X-User-ID")
+                if header_user_id:
+                    user_id = header_user_id
                 channel_id = http_request.headers.get("X-Channel-ID")
                 request_id = http_request.headers.get("X-Request-ID")
         except Exception:
             pass
+
+        logger.info(
+            "Processing RAG query: {}",
+            request.query,
+            extra={
+                "request_id": request_id,
+                "user_id": user_id,
+                "channel_id": channel_id,
+            },
+        )
 
         # Run RAG pipeline
         answer, contexts, metadata = run_rag_pipeline(
@@ -66,7 +77,15 @@ async def query_rag(
         session.commit()
         session.refresh(query_record)
 
-        logger.info(f"Query saved to database with ID: {query_record.id}")
+        logger.info(
+            "Query saved to database with ID: {}",
+            query_record.id,
+            extra={
+                "request_id": request_id,
+                "user_id": user_id,
+                "query_id": query_record.id,
+            },
+        )
 
         # Store RAG result in Weaviate with query_id
         dur = perf_counter() - start
@@ -82,7 +101,10 @@ async def query_rag(
 
     except Exception as e:
         logger.error(f"RAG query failed: {str(e)}")
-        session.rollback()
+        try:
+            session.rollback()
+        except Exception:
+            pass  # Session might already be closed
         raise HTTPException(
             status_code=500, detail=f"Query processing failed: {str(e)}"
         )

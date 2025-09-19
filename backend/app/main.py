@@ -31,10 +31,18 @@ app = FastAPI(
 setup_error_handlers(app)
 
 # Setup CORS
+allow_origins = settings.CORS_ORIGINS
+allow_credentials = settings.CORS_ALLOW_CREDENTIALS
+
+if allow_credentials and ("*" in allow_origins):
+    # fix: don't allow wildcard with credentials
+    allow_origins = [o for o in allow_origins if o != "*"]
+    allow_credentials = False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+    allow_origins=allow_origins,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

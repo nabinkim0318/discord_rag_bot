@@ -7,7 +7,6 @@ from typing import Generator
 from sqlmodel import Session, create_engine
 
 from app.core.logging import log_database_operation, logger
-from app.core.retry import retry_database
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./db.sqlite3")
 engine = create_engine(
@@ -19,7 +18,6 @@ engine = create_engine(
 )
 
 
-@retry_database(max_attempts=3)
 def get_session() -> Generator[Session, None, None]:
     """
     Database session dependency
