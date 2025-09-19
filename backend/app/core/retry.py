@@ -20,6 +20,15 @@ class CircuitState(Enum):
     OPEN = "open"  # Failing, blocking requests
     HALF_OPEN = "half_open"  # Testing if service recovered
 
+    def to_int(self) -> int:
+        """Convert state to integer for metrics"""
+        mapping = {
+            CircuitState.CLOSED: 0,
+            CircuitState.HALF_OPEN: 1,
+            CircuitState.OPEN: 2,
+        }
+        return mapping[self]
+
 
 class RetryConfig:
     """Configuration for retry logic"""
@@ -69,6 +78,16 @@ class CircuitBreaker:
         self.failure_count = 0
         self.last_failure_time = None
         self.success_count = 0
+        self._update_metrics()
+
+    def _update_metrics(self):
+        """Update circuit breaker state metrics"""
+        try:
+            from app.core.metrics import circuit_breaker_state
+
+            circuit_breaker_state.labels(service=self.name).set(self.state.to_int())
+        except ImportError:
+            pass  # Metrics not available
 
     def can_execute(self) -> bool:
         """Check if request can be executed"""
@@ -78,6 +97,7 @@ class CircuitBreaker:
             if time.time() - self.last_failure_time > self.config.recovery_timeout:
                 self.state = CircuitState.HALF_OPEN
                 self.success_count = 0
+                self._update_metrics()
                 logger.info("Circuit breaker '{}' moved to HALF_OPEN", self.name)
                 return True
             return False
@@ -92,6 +112,7 @@ class CircuitBreaker:
             if self.success_count >= 2:  # Require 2 successes to close
                 self.state = CircuitState.CLOSED
                 self.failure_count = 0
+                self._update_metrics()
                 logger.info("Circuit breaker '{}' moved to CLOSED", self.name)
         elif self.state == CircuitState.CLOSED:
             self.failure_count = 0
@@ -103,12 +124,14 @@ class CircuitBreaker:
 
         if self.failure_count >= self.config.failure_threshold:
             self.state = CircuitState.OPEN
+            self._update_metrics()
             logger.warning(
                 f"Circuit breaker '{self.name}' moved to OPEN "
                 f"(failures: {self.failure_count})"
             )
         elif self.state == CircuitState.HALF_OPEN:
             self.state = CircuitState.OPEN
+            self._update_metrics()
             logger.warning(f"Circuit breaker '{self.name}' moved back to OPEN")
 
 

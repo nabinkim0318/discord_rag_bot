@@ -10,6 +10,7 @@ from typing import Dict, Optional, Tuple
 
 import httpx
 import interactions
+from httpx import Limits, Retry
 from interactions import (
     ActionRow,
     Button,
@@ -27,7 +28,13 @@ from metrics import RAG_FAILURES, RAG_LATENCY, RAG_TOTAL
 
 logger = logging.getLogger("discord_bot")
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+
+# HTTP client configuration
+retry = Retry(max_attempts=3, backoff_factor=0.5)
+limits = Limits(max_keepalive_connections=20, max_connections=50)
+
 BACKEND_BASE = os.environ.get("BACKEND_BASE", "http://api:8001")
+METRICS_PATH = os.environ.get("METRICS_PATH", "/metrics")
 DISCORD_TOKEN = os.environ.get("DISCORD_BOT_TOKEN")
 if not DISCORD_TOKEN:
     raise RuntimeError("DISCORD_BOT_TOKEN is not set. Check your .env")
@@ -40,8 +47,11 @@ async def call_backend_query(
         "X-User-ID": user_id,
         "X-Channel-ID": channel_id or "",
         "X-Request-ID": str(uuid.uuid4()),
+        "User-Agent": "discord-rag-bot/1.0",
     }
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(
+        timeout=30.0, limits=limits, transport=httpx.AsyncHTTPTransport(retries=retry)
+    ) as client:
         r = await client.post(
             f"{BACKEND_BASE}/api/query/",
             json={"query": question, "top_k": top_k, "user_id": user_id},
@@ -54,11 +64,17 @@ async def call_backend_query(
 async def call_backend_feedback(
     query_id: str, user_id: str, score: str, comment: Optional[str]
 ):
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    headers = {
+        "X-User-ID": user_id,
+        "User-Agent": "discord-rag-bot/1.0",
+    }
+    async with httpx.AsyncClient(
+        timeout=15.0, limits=limits, transport=httpx.AsyncHTTPTransport(retries=retry)
+    ) as client:
         r = await client.post(
             f"{BACKEND_BASE}/api/v1/feedback/",
             json={"query_id": query_id, "feedback_type": score, "comment": comment},
-            headers={"X-User-ID": user_id},
+            headers=headers,
         )
         r.raise_for_status()
         return r.json()
@@ -172,7 +188,13 @@ async def ask(ctx: SlashContext, question: str, private: bool = False):
 @component_callback("fb:", regex=True)
 async def on_feedback_btn(ctx: ComponentContext):
     try:
-        _, query_id, score = ctx.custom_id.split(":")  # fb:<query_id>:up|down
+        parts = ctx.custom_id.split(":")
+        if len(parts) != 3:
+            raise ValueError("invalid custom_id")
+        _, query_id, score = parts
+        if score not in ("up", "down"):
+            raise ValueError("invalid score")
+
         await call_backend_feedback(
             query_id=query_id,
             user_id=str(ctx.author.id),
@@ -180,6 +202,11 @@ async def on_feedback_btn(ctx: ComponentContext):
             comment=None,
         )
         await ctx.send("Thank you for your feedback!", flags=MessageFlags.EPHEMERAL)
+    except ValueError as e:
+        logger.warning("Invalid feedback button clicked: {}", e)
+        await ctx.send(
+            "Invalid feedback button. Please try again.", flags=MessageFlags.EPHEMERAL
+        )
     except httpx.HTTPError:
         await ctx.send(
             "Backend is not responding. Please try again later.",
@@ -194,8 +221,15 @@ async def on_feedback_btn(ctx: ComponentContext):
 )
 async def health(ctx: SlashContext):
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            r = await client.get(f"{BACKEND_BASE}/api/v1/health/")
+        async with httpx.AsyncClient(
+            timeout=5.0,
+            limits=limits,
+            transport=httpx.AsyncHTTPTransport(retries=retry),
+        ) as client:
+            r = await client.get(
+                f"{BACKEND_BASE}/api/v1/health/",
+                headers={"User-Agent": "discord-rag-bot/1.0"},
+            )
             r.raise_for_status()
             data = r.json()
         await ctx.send(
@@ -241,15 +275,23 @@ def parse_prometheus_text(text: str) -> Dict[str, Dict[Tuple, float]]:
 
 
 async def get_backend_text(url: str, timeout: float = 10.0) -> str:
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        r = await client.get(url)
+    async with httpx.AsyncClient(
+        timeout=timeout,
+        limits=limits,
+        transport=httpx.AsyncHTTPTransport(retries=retry),
+    ) as client:
+        r = await client.get(url, headers={"User-Agent": "discord-rag-bot/1.0"})
         r.raise_for_status()
         return r.text
 
 
 async def get_backend_json(url: str, timeout: float = 10.0) -> dict:
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        r = await client.get(url)
+    async with httpx.AsyncClient(
+        timeout=timeout,
+        limits=limits,
+        transport=httpx.AsyncHTTPTransport(retries=retry),
+    ) as client:
+        r = await client.get(url, headers={"User-Agent": "discord-rag-bot/1.0"})
         r.raise_for_status()
         return r.json()
 
@@ -304,7 +346,7 @@ async def config(ctx: SlashContext):
 async def metrics(ctx: SlashContext):
     await ctx.defer(flags=MessageFlags.EPHEMERAL)
     try:
-        text = await get_backend_text(f"{BACKEND_BASE}/metrics", timeout=8.0)
+        text = await get_backend_text(f"{BACKEND_BASE}{METRICS_PATH}", timeout=8.0)
         m = parse_prometheus_text(text)
 
         # Helpers to extract by label

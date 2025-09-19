@@ -43,7 +43,7 @@ groups:
               to: 0
             model:
               refId: B
-              expr: sum(rate(rag_retrieval_hits_total{hit=\"true\"}[5m])) / sum(rate(rag_retrieval_hits_total[5m]))
+              expr: (sum(rate(rag_retrieval_hits_total{hit=\"true\"}[5m])) / sum(rate(rag_retrieval_hits_total[5m]))) AND (sum(rate(rag_retrieval_hits_total[5m])) > 0)
               format: time_series
               instant: false
         noDataState: NoData

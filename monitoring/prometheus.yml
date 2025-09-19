@@ -24,6 +24,6 @@ scrape_configs:
   - job_name: "weaviate"
     static_configs:
       - targets: ["weaviate:8080"]
-    metrics_path: "/v1/metrics"
+    metrics_path: "/metrics"
     scrape_interval: 30s
     scrape_timeout: 10s
