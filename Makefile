@@ -43,7 +43,7 @@ lint-rag:
 lint-frontend:
 	cd frontend && npm run format:check
 
-format: format-backend format-rag format-frontend
+format: format-backend format-rag format-frontend format-all
 
 format-backend:
 	cd backend && poetry run isort .
@@ -55,6 +55,9 @@ format-rag:
 
 format-frontend:
 	cd frontend && npm run format
+
+format-all:
+	npx prettier --write .
 
 test: test-backend test-rag test-frontend
 
