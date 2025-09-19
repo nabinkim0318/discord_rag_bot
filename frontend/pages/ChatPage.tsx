@@ -62,7 +62,7 @@ export default function ChatPage() {
             <div key={i}>
               <ChatMessage role={msg.role} message={msg.message} />
               {msg.role === "bot" && i === messages.length - 1 && (
-                <FeedbackButtons onFeedback={handleFeedback} />
+                <FeedbackButtons onFeedback={handleFeedback} queryId={msg.queryId} />
               )}
             </div>
           ))
