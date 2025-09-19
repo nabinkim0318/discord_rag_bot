@@ -55,10 +55,20 @@ test-rag:
 # ======== App Run (Backend & RAG Agent CLI) ========
 
 run-backend:
-	cd backend && poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+	cd backend && poetry run uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 
 run-rag:
 	cd rag_agent && poetry run python rag_agent/generation/cli_generate.py --query "Sample Query"
+
+# ======== RAG Evaluation ========
+
+eval-rag:
+	cd rag_agent && poetry run python evaluation/cli_eval.py --input data/test_dataset.json --prompt-version v1.1
+
+eval-rag-all:
+	cd rag_agent && poetry run python evaluation/cli_eval.py --input data/test_dataset.json --prompt-version v1.0
+	cd rag_agent && poetry run python evaluation/cli_eval.py --input data/test_dataset.json --prompt-version v1.1
+	cd rag_agent && poetry run python evaluation/cli_eval.py --input data/test_dataset.json --prompt-version v2.0
 
 # ======== Maintenance ========
 
