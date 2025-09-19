@@ -28,15 +28,15 @@ make docker-up-with-bot
 
 ## 📋 Service Configuration
 
-| Service | Port | Description | Dependencies |
-|---------|------|-------------|--------------|
-| `weaviate` | 8080 | Vector Database | - |
-| `api` | 8001 | Backend API | weaviate, rag_agent |
-| `rag_agent` | - | RAG Agent | - |
-| `bot` | - | Discord Bot | api |
-| `frontend` | 3000 | Next.js Frontend | api |
-| `prometheus` | 9090 | Metrics Collection | - |
-| `grafana` | 3001 | Monitoring Dashboard | prometheus |
+| Service      | Port | Description          | Dependencies        |
+| ------------ | ---- | -------------------- | ------------------- |
+| `weaviate`   | 8080 | Vector Database      | -                   |
+| `api`        | 8001 | Backend API          | weaviate, rag_agent |
+| `rag_agent`  | -    | RAG Agent            | -                   |
+| `bot`        | -    | Discord Bot          | api                 |
+| `frontend`   | 3000 | Next.js Frontend     | api                 |
+| `prometheus` | 9090 | Metrics Collection   | -                   |
+| `grafana`    | 3001 | Monitoring Dashboard | prometheus          |
 
 ## 🌐 Network Configuration
 

@@ -6,7 +6,8 @@ import LoadingMessage from "./LoadingMessage";
 import { useChat } from "./useChat";
 
 export default function ChatPage() {
-  const { messages, loading, sendMessage, retryLast, error, setError } = useChat();
+  const { messages, loading, sendMessage, retryLast, error, setError } =
+    useChat();
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -62,7 +63,10 @@ export default function ChatPage() {
             <div key={i}>
               <ChatMessage role={msg.role} message={msg.message} />
               {msg.role === "bot" && i === messages.length - 1 && (
-                <FeedbackButtons onFeedback={handleFeedback} queryId={msg.queryId} />
+                <FeedbackButtons
+                  onFeedback={handleFeedback}
+                  queryId={msg.queryId}
+                />
               )}
             </div>
           ))
