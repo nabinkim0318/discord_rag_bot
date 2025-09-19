@@ -1,5 +1,7 @@
 # bots/discord/bot.py
 # import asyncio
+# from config import SETTINGS
+import logging
 import os
 import re
 import time
@@ -8,9 +10,6 @@ from typing import Dict, Optional, Tuple
 
 import httpx
 import interactions
-
-# from config import SETTINGS
-from core.logging import logger
 from interactions import (
     ActionRow,
     Button,
@@ -26,17 +25,27 @@ from interactions import (
 from interactions.api.http import Forbidden
 from metrics import RAG_FAILURES, RAG_LATENCY, RAG_TOTAL
 
-BACKEND_BASE = os.environ.get("API_BASE_URL", "http://api:8001")
-DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
+logger = logging.getLogger("discord_bot")
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+BACKEND_BASE = os.environ.get("BACKEND_BASE", "http://api:8001")
+DISCORD_TOKEN = os.environ.get("DISCORD_BOT_TOKEN")
 if not DISCORD_TOKEN:
-    raise RuntimeError("DISCORD_TOKEN is not set. Check your .env")
+    raise RuntimeError("DISCORD_BOT_TOKEN is not set. Check your .env")
 
 
-async def call_backend_query(question: str, user_id: str, top_k: int = 5):
+async def call_backend_query(
+    question: str, user_id: str, top_k: int = 5, channel_id: str | None = None
+):
+    headers = {
+        "X-User-ID": user_id,
+        "X-Channel-ID": channel_id or "",
+        "X-Request-ID": str(uuid.uuid4()),
+    }
     async with httpx.AsyncClient(timeout=30.0) as client:
         r = await client.post(
             f"{BACKEND_BASE}/api/query/",
             json={"query": question, "top_k": top_k, "user_id": user_id},
+            headers=headers,
         )
         r.raise_for_status()
         return r.json()  # {answer, contexts, metadata, query_id}
@@ -105,7 +114,10 @@ async def ask(ctx: SlashContext, question: str, private: bool = False):
 
     try:
         payload = await call_backend_query(
-            question, user_id=str(ctx.author.id), top_k=5
+            question,
+            user_id=str(ctx.author.id),
+            top_k=5,
+            channel_id=str(ctx.channel_id),
         )
         answer = payload.get("answer", "[no answer]")
         query_id = payload.get("query_id") or str(uuid.uuid4())  # button fallback id
@@ -131,14 +143,17 @@ async def ask(ctx: SlashContext, question: str, private: bool = False):
                 )
         else:
             sent = await ctx.send(answer, components=fb_buttons(query_id))
-            print(sent)
-            print(sent.id)
+            logger.info("Sent message to channel: {}", sent)
 
         # discord_message_id = getattr(sent, "id", None)
         RAG_TOTAL.inc()
         RAG_LATENCY.observe(latency / 1000.0)
 
     except httpx.HTTPError:
+        RAG_TOTAL.inc()
+        RAG_FAILURES.inc()
+        # fail latency also aggregate (meaningful)
+        RAG_LATENCY.observe((time.perf_counter() - start) / 1000.0)
         await ctx.send(
             "Backend is not responding. Please try again later.",
             flags=MessageFlags.EPHEMERAL,
@@ -147,6 +162,7 @@ async def ask(ctx: SlashContext, question: str, private: bool = False):
     except Exception:
         RAG_TOTAL.inc()
         RAG_FAILURES.inc()
+        RAG_LATENCY.observe((time.perf_counter() - start) / 1000.0)
         await ctx.send(
             "Sorry, I can't answer your question right now. Please try again later.",
             flags=MessageFlags.EPHEMERAL,
@@ -252,7 +268,7 @@ async def config(ctx: SlashContext):
         h_llm = await get_backend_json(f"{BACKEND_BASE}/api/v1/health/llm")
         h_vec = await get_backend_json(f"{BACKEND_BASE}/api/v1/health/vector-store")
 
-        # data sources (우선순위: ENV → 없음)
+        # data sources (priority: ENV → None)
         sources_env = os.environ.get("DATA_SOURCES", "")
         sources = [s.strip() for s in sources_env.split(",") if s.strip()]
         sources_str = ", ".join(sources) if sources else "(not set)"
