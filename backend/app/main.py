@@ -67,11 +67,12 @@ async def log_requests(request: Request, call_next):
     start_time = time()
     request_id = str(uuid4())
     user_id = request.headers.get("X-User-ID", "anonymous")
+    channel_id = request.headers.get("X-Channel-ID", "unknown")
 
     # Request start logging
-    logger.info(
-        f"[{request_id}] Request started: {request.method} {request.url.path} | "
-        f"User: {user_id}"
+    logger.bind(request_id=request_id, user_id=user_id, channel_id=channel_id).info(
+        f"Request started: {request.method} {request.url.path} \
+        | User: {user_id} | Channel: {channel_id} | RequestID: {request_id}"
     )
 
     try:
@@ -85,6 +86,7 @@ async def log_requests(request: Request, call_next):
             status_code=response.status_code,
             duration=duration,
             user_id=user_id,
+            channel_id=channel_id,
             request_id=request_id,
         )
 
@@ -92,8 +94,11 @@ async def log_requests(request: Request, call_next):
 
     except Exception as e:
         duration = time() - start_time
-        logger.error(
-            f"[{request_id}] Request failed: {request.method} {request.url.path} | "
-            f"User: {user_id} | Duration: {duration:.3f}s | Error: {str(e)}"
+        logger.bind(
+            request_id=request_id, user_id=user_id, channel_id=channel_id
+        ).error(
+            f"Request failed: {request.method} {request.url.path} \
+            | User: {user_id} | Channel: {channel_id} | Duration: {duration:.3f}s \
+            | Error: {str(e)}"
         )
         raise
