@@ -1,85 +1,108 @@
 # ========================
-# Common (Global)
+# Global (cross-project)
 # ========================
-__pycache__/
-*.py[cod]
-*.so
-*.egg-info/
-*.log
-*.DS_Store
-.env
-.env.*
-venv/
-.venv/
-.cache/
-dist/
-build/
-coverage/
-*.sqlite3
-*.db
-
-# ========================
-# Python Specific (backend, rag_agent)
-# ========================
-/backend/.mypy_cache/
-/backend/.pytest_cache/
-/rag_agent/.mypy_cache/
-/backend/.env
-/rag_agent/.env
-/rag_agent/.pytest_cache/
-.ipynb_checkpoints/
-logs/              # log directory (loguru)
-
-# Ignore compiled Python files
-**/*.pyc
-**/*.pyo
-**/*.pyd
-
-# ========================
-# Node.js Specific (frontend, discord-bot if any)
-# ========================
-/frontend/node_modules/
-/frontend/.next/
-/frontend/.vercel/
-/frontend/.env.local
-/frontend/.env.development.local
-/frontend/.env.test.local
-/frontend/.env.production.local
-
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# ========================
-# Docker & Containers
-# ========================
-/**/.docker-compose.override.yml
-**/Dockerfile.*
-.dockerignore
-
-# ========================
-# IDEs / Editors
-# ========================
+# OS / editor
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 .vscode/
 .idea/
 *.swp
 *.bak
 *.tmp
 
-# ========================
-# OS files
-# ========================
-Thumbs.db
-ehthumbs.db
-Desktop.ini
+# Python bytecode / caches
+**/__pycache__/
+**/*.py[cod]
+**/*.pyo
+**/*.pyd
+**/.pytest_cache/
+**/.mypy_cache/
+.ipynb_checkpoints/
+
+# Logs & build artifacts (all projects)
+**/logs/
+**/*.log
+**/dist/
+**/build/
+coverage/
+.coverage
+htmlcov/
+
+# Env files (keep only examples in VCS)
+.env
+.env.*
+**/.env
+**/.env.*
+
+# SQLite & generic DB files
+*.sqlite3
+*.db
+
 
 # ========================
-# Custom folders (optional)
+# Python (backend, rag_agent)
 # ========================
-/data/              # rag_agent experiment data (optional)
-/scripts/__pycache__/
-/scripts/*.pyc
-.env
-.env
-.env
+# Virtualenvs
+venv/
+.venv/
+
+# Project-local ignores
+backend/.env
+rag_agent/.env
+
+# If backend uses sqlite locally
+backend/db.sqlite3
+
+# (Optional) rag_agent data & artifacts kept out of git
+rag_agent/data/
+!rag_agent/data/README.md
+
+
+# ========================
+# Node / Next.js (frontend, discord bot)
+# ========================
+# Node modules & Next outputs
+**/node_modules/
+**/.next/
+**/out/
+
+# Frontend env variants (Next)
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# Package managers logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+
+# ========================
+# Containers / DevOps
+# ========================
+# DO NOT ignore Dockerfiles by default (we want them tracked)
+# Docker Compose override (local-only)
+**/docker-compose.override.yml
+
+# (optional) local compose profiles
+**/.compose/
+
+# .dockerignore should be tracked; do not ignore it
+
+
+# ========================
+# Monitoring / Tooling
+# ========================
+# Keep Grafana/Prometheus configs tracked; add project-specific ignores below if needed
+# (nothing here by default)
+
+
+# ========================
+# Frontend tooling
+# ========================
+# Jest / SWC / Babel caches (safe to ignore if present)
+**/.cache/

@@ -1,6 +1,112 @@
 version: "3.9"
 
 services:
+  # ==================== Vector Database ====================
+  weaviate:
+    image: semitechnologies/weaviate:1.24.10
+    container_name: weaviate
+    ports:
+      - "8080:8080"
+    environment:
+      QUERY_DEFAULTS_LIMIT: "25"
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      DEFAULT_VECTORIZER_MODULE: "text2vec-openai"
+      ENABLE_MODULES: "text2vec-openai"
+      OPENAI_APIKEY: "${OPENAI_API_KEY}"
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    networks:
+      - app_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/meta"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==================== Backend API ====================
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: discord-rag-api
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+      - ./rag_agent:/app/rag_agent
+    ports:
+      - "8001:8001"
+    command: poetry run uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+    depends_on:
+      weaviate:
+        condition: service_healthy
+      rag_agent:
+        condition: service_started
+    networks:
+      - app_net
+      - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==================== RAG Agent ====================
+  rag_agent:
+    build:
+      context: ./rag_agent
+      dockerfile: Dockerfile
+    container_name: discord-rag-agent
+    volumes:
+      - ./rag_agent:/app
+    command: ["sleep", "infinity"]
+    networks:
+      - app_net
+    restart: unless-stopped
+
+  # ==================== Discord Bot ====================
+  bot:
+    build:
+      context: ./bots
+      dockerfile: Dockerfile
+    container_name: discord-rag-bot
+    env_file:
+      - ./bots/.env
+    volumes:
+      - ./bots:/app
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - app_net
+    restart: unless-stopped
+    profiles:
+      - discord  # Optional profile for Discord bot
+
+  # ==================== Frontend ====================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: discord-rag-frontend
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_BACKEND_API_URL=http://api:8001/api/v1
+    command: npm run dev
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - app_net
+    restart: unless-stopped
+
+  # ==================== Monitoring ====================
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -17,6 +123,7 @@ services:
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
     networks:
+      - app_net
       - monitoring
     restart: unless-stopped
 
@@ -24,7 +131,7 @@ services:
     image: grafana/grafana:latest
     container_name: grafana
     ports:
-      - "3001:3000"  # port conflict resolution
+      - "3001:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin123
       - GF_USERS_ALLOW_SIGN_UP=false
@@ -33,61 +140,23 @@ services:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
     networks:
+      - app_net
       - monitoring
     depends_on:
       - prometheus
     restart: unless-stopped
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: discord-rag-backend
-    env_file:
-      - ./backend/.env
-    volumes:
-      - ./backend:/app
-      - ./rag_agent:/app/rag_agent
-    ports:
-      - "8001:8001"  # port change
-    command: poetry run uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
-    depends_on:
-      - rag_agent
-    networks:
-      - default
-      - monitoring  # add monitoring network for Prometheus metric collection
-
-  rag_agent:
-    build:
-      context: ./rag_agent
-      dockerfile: Dockerfile
-    container_name: discord-rag-agent
-    volumes:
-      - ./rag_agent:/app
-    command: ["sleep", "infinity"]
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: discord-rag-frontend
-    volumes:
-      - ./frontend:/app
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_BACKEND_API_URL=http://localhost:8000/api/v1
-    command: npm run dev
-    depends_on:
-      - backend
 
 networks:
-  default:
+  app_net:
     driver: bridge
+    name: discord_rag_network
   monitoring:
     driver: bridge
     name: monitoring_network
 
 volumes:
+  weaviate_data:
+    driver: local
   prometheus_data:
     driver: local
   grafana_data:
