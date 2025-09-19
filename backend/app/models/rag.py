@@ -36,3 +36,4 @@ class RAGQueryResponse(BaseModel):
     answer: str
     contexts: List[str]  # Simplified: list of strings
     metadata: dict  # Simplified: dictionary
+    query_id: Optional[str] = Field(None, description="database query ID for tracking")
