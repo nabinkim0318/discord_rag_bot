@@ -3,7 +3,7 @@ import { useState } from "react";
 
 export function useChat() {
   const [messages, setMessages] = useState<
-    { role: "user" | "bot"; message: string }[]
+    { role: "user" | "bot"; message: string; queryId?: string | null }[]
   >([]);
   const [loading, setLoading] = useState(false);
   const [lastPrompt, setLastPrompt] = useState<string | null>(null);
@@ -30,7 +30,10 @@ export function useChat() {
       }
 
       const data = await response.json();
-      setMessages((prev) => [...prev, { role: "bot", message: data.response }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "bot", message: data.response, queryId: data.query_id },
+      ]);
     } catch (err) {
       console.error("Chat error:", err);
       const errorMessage =

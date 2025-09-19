@@ -1,9 +1,9 @@
 // frontend/pages/FeedbackButtons.tsx
 "use client";
-import React from "react";
 
 type Props = {
   onFeedback: (type: "like" | "dislike" | "retry") => void;
+  queryId?: string | null;
 };
 
 export default function FeedbackButtons({ onFeedback }: Props) {

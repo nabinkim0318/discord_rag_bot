@@ -41,6 +41,7 @@ export default async function handler(
 
     return res.status(200).json({
       response: data.answer || "no response",
+      query_id: data.query_id || null,
     });
   } catch (error) {
     console.error("API route error:", error);
