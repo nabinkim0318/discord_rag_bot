@@ -118,6 +118,10 @@ def run_rag_pipeline(
     user_id: Optional[str] = None,
     channel_id: Optional[str] = None,
     request_id: Optional[str] = None,
+    # A/B 실험 파라미터
+    prompt_version: Optional[str] = None,
+    use_rerank: bool = False,
+    ab_test_group: Optional[str] = None,
 ) -> Tuple[str, List[str], Dict]:
     """
     Complete RAG pipeline execution
@@ -144,13 +148,35 @@ def run_rag_pipeline(
         # Record retrieval hit (whether any context was found)
         record_retrieval_hit(len(context_texts) > 0)
 
-        # 3. Construct prompt
-        prompt = f"""Context Documents:
+        # 2. A/B 실험: 프롬프트 버전 결정
+        if prompt_version is None:
+            if ab_test_group == "random":
+                # 랜덤 버전 선택
+                try:
+                    from rag_agent.generation.prompt_builder import prompt_builder
+
+                    prompt_version = prompt_builder.get_random_version()
+                except ImportError:
+                    prompt_version = "v1.1"  # fallback
+            else:
+                prompt_version = "v1.1"  # 기본 버전
+
+        # 3. Construct prompt with version management
+        try:
+            from rag_agent.generation.prompt_builder import build_prompt
+
+            prompt_data = build_prompt(context_texts, query, version=prompt_version)
+            prompt = prompt_data["prompt"]
+            prompt_metadata = prompt_data["metadata"]
+        except ImportError:
+            # Fallback to simple prompt
+            prompt = f"""Context Documents:
 {chr(10).join([f"- {text}" for text in context_texts])}
 
 Question: {query}
 
 Please provide a comprehensive answer based on the context documents above:"""
+            prompt_metadata = {"version": "fallback"}
 
         # 4. Call LLM
         answer = call_llm(prompt)
@@ -164,6 +190,11 @@ Please provide a comprehensive answer based on the context documents above:"""
             "pipeline_duration": round(duration, 3),
             "model": "mock-llm",
             "embedding_model": "weaviate-openai",
+            # A/B 실험 메타데이터
+            "prompt_version": prompt_version,
+            "ab_test_group": ab_test_group,
+            "use_rerank": use_rerank,
+            **prompt_metadata,
         }
 
         # 6. Store RAG result in Weaviate

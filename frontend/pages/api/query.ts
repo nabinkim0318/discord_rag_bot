@@ -23,7 +23,7 @@ export default async function handler(
     console.log("🔍 Received query:", prompt);
 
     // RAG backend call
-    const backendRes = await fetch("http://localhost:8001/api/query/", {
+    const backendRes = await fetch("http://127.0.0.1:8001/api/query/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: prompt, top_k: 5 }),

@@ -1,0 +1,27 @@
+[
+  {
+    "query": "What is Retrieval-Augmented Generation?",
+    "expected_answer": "RAG is a technique that combines retrieval of relevant documents with generation of responses using language models.",
+    "category": "definition"
+  },
+  {
+    "query": "How does vector search work?",
+    "expected_answer": "Vector search converts text into numerical vectors and finds similar documents based on vector similarity.",
+    "category": "technical"
+  },
+  {
+    "query": "What are the benefits of using RAG?",
+    "expected_answer": "RAG provides up-to-date information, reduces hallucinations, and allows for domain-specific knowledge integration.",
+    "category": "benefits"
+  },
+  {
+    "query": "안녕하세요, RAG에 대해 설명해주세요",
+    "expected_answer": "RAG는 검색 증강 생성 기술로, 관련 문서를 검색하고 언어 모델을 사용해 응답을 생성하는 방법입니다.",
+    "category": "korean"
+  },
+  {
+    "query": "What is the difference between fine-tuning and RAG?",
+    "expected_answer": "Fine-tuning modifies the model weights, while RAG retrieves external knowledge without changing the model.",
+    "category": "comparison"
+  }
+]
