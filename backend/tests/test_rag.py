@@ -37,4 +37,8 @@ def test_query_rag_success(client):
 def test_query_rag_failure_cases(client, payload, expected_status):
     response = client.post("/api/v1/rag/", json=payload)
     assert response.status_code == expected_status
-    assert "detail" in response.json()
+    data = response.json()
+    # Check for new error response format
+    assert "error" in data
+    assert "error_code" in data
+    assert "message" in data

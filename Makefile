@@ -1,9 +1,9 @@
 # ======== Project Setup ========
 
-.PHONY: install-backend install-rag backend-setup rag-setup clean lint-backend lint-rag format-backend format-rag test-backend test-rag run-backend run-rag lock-backend lock-rag update-backend update-rag check-backend check-rag precommit-backend precommit-rag commit
+.PHONY: install-backend install-rag install-frontend backend-setup rag-setup frontend-setup clean lint-backend lint-rag lint-frontend format-backend format-rag format-frontend test-backend test-rag test-frontend run-backend run-rag run-frontend lock-backend lock-rag update-backend update-rag update-frontend check-backend check-rag check-frontend precommit-backend precommit-rag precommit-frontend commit
 
 # ==== Install Dependencies ====
-install: install-backend install-rag
+install: install-backend install-rag install-frontend
 
 install-backend:
 	cd backend && poetry install || true
@@ -13,7 +13,10 @@ install-rag:
 	cd rag_agent && poetry install || true
 	cd rag_agent && poetry run pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-setup: backend-setup rag-setup
+install-frontend:
+	cd frontend && npm install
+
+setup: backend-setup rag-setup frontend-setup
 
 backend-setup:
 	cd backend && poetry shell
@@ -21,8 +24,11 @@ backend-setup:
 rag-setup:
 	cd rag_agent && poetry shell
 
+frontend-setup:
+	cd frontend && npm install
+
 # ======== Development ========
-lint: lint-backend lint-rag
+lint: lint-backend lint-rag lint-frontend
 
 lint-backend:
 	cd backend && poetry run black --check .
@@ -34,7 +40,10 @@ lint-rag:
 	cd rag_agent && poetry run isort --check .
 	cd rag_agent && poetry run flake8 .
 
-format: format-backend format-rag
+lint-frontend:
+	cd frontend && npm run format:check
+
+format: format-backend format-rag format-frontend
 
 format-backend:
 	cd backend && poetry run isort .
@@ -44,7 +53,10 @@ format-rag:
 	cd rag_agent && poetry run isort .
 	cd rag_agent && poetry run black .
 
-test: test-backend test-rag
+format-frontend:
+	cd frontend && npm run format
+
+test: test-backend test-rag test-frontend
 
 test-backend:
 	cd backend && poetry run pytest tests
@@ -55,6 +67,9 @@ test-backend-error:
 test-rag:
 	cd rag_agent && poetry run pytest tests
 
+test-frontend:
+	cd frontend && npm test
+
 # ======== App Run (Backend & RAG Agent CLI) ========
 
 run-backend:
@@ -62,6 +77,9 @@ run-backend:
 
 run-rag:
 	cd rag_agent && poetry run python rag_agent/generation/cli_generate.py --query "Sample Query"
+
+run-frontend:
+	cd frontend && npm run dev
 
 # ======== RAG Evaluation ========
 
