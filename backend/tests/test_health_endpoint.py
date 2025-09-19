@@ -9,6 +9,34 @@ def test_health_root():
         assert resp.status_code == 200
         data = resp.json()
         assert "status" in data or isinstance(data, dict)
+        assert "duration" in data
+
+
+def test_health_db():
+    with TestClient(app) as client:
+        resp = client.get("/api/v1/health/db")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "status" in data
+        assert "duration" in data
+
+
+def test_health_llm():
+    with TestClient(app) as client:
+        resp = client.get("/api/v1/health/llm")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "status" in data
+        assert "duration" in data
+
+
+def test_health_vector_store():
+    with TestClient(app) as client:
+        resp = client.get("/api/v1/health/vector-store")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "status" in data
+        assert "duration" in data
 
 
 def test_query_endpoint_mock(monkeypatch):

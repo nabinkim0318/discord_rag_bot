@@ -5,6 +5,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from app.core.exceptions import RAGException
 from app.core.logging import log_rag_operation, logger
+from app.core.metrics import (
+    record_rag_pipeline_latency,
+    record_retrieval_hit,
+    record_retriever_topk,
+)
 
 
 def get_embedding(query: str) -> List[float]:
@@ -122,9 +127,15 @@ def run_rag_pipeline(query: str, top_k: int = 5) -> Tuple[str, List[str], Dict]:
     try:
         logger.info(f"Starting RAG pipeline for query: '{query[:50]}...'")
 
+        # Record requested top_k distribution
+        record_retriever_topk(top_k)
+
         # 1. Search similar documents using Weaviate
         docs = search_similar_documents(query, top_k)
         context_texts = [doc["text"] for doc in docs]
+
+        # Record retrieval hit (whether any context was found)
+        record_retrieval_hit(len(context_texts) > 0)
 
         # 3. Construct prompt
         prompt = f"""Context Documents:
@@ -159,12 +170,17 @@ Please provide a comprehensive answer based on the context documents above:"""
             contexts_count=len(context_texts),
         )
 
+        # Record pipeline latency metric
+        record_rag_pipeline_latency(duration)
+
         logger.info(f"RAG pipeline completed successfully in {duration:.3f}s")
         return answer, context_texts, metadata
 
     except RAGException:
         # RAG-related exceptions are re-raised
         duration = time.time() - start_time
+        # Record pipeline latency even on handled RAGException
+        record_rag_pipeline_latency(duration)
         log_rag_operation(query=query, success=False, duration=duration)
         raise
 
@@ -172,6 +188,8 @@ Please provide a comprehensive answer based on the context documents above:"""
         # Unexpected exception
         duration = time.time() - start_time
         logger.error(f"Unexpected error in RAG pipeline: {str(e)}")
+        # Record pipeline latency on unexpected error
+        record_rag_pipeline_latency(duration)
         log_rag_operation(query=query, success=False, duration=duration)
         raise RAGException(f"Unexpected error in RAG pipeline: {str(e)}")
 

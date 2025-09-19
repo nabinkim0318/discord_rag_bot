@@ -33,6 +33,23 @@ rag_query_latency = create_histogram(
     "rag_query_latency_seconds", "Latency for RAG queries", ["endpoint"]
 )
 
+# Additional RAG metrics
+rag_pipeline_latency = create_histogram(
+    "rag_pipeline_latency_seconds",
+    "End-to-end RAG pipeline latency (retrieval + generation)",
+)
+
+rag_retrieval_hit_counter = create_counter(
+    "rag_retrieval_hits_total",
+    "RAG retrieval hit outcomes (whether any contexts were found)",
+    ["hit"],
+)
+
+rag_retriever_topk = create_histogram(
+    "rag_retriever_topk",
+    "Distribution of requested top_k values for retrieval",
+)
+
 # ==================== Feedback Metrics ====================
 
 feedback_counter = create_counter(
@@ -109,6 +126,25 @@ def record_feedback_metric(feedback_type: str):
 def record_failure_metric(endpoint: str, error_type: str):
     """Record failed request metric"""
     rag_query_failures.labels(endpoint=endpoint, error_type=error_type).inc()
+
+
+def record_rag_pipeline_latency(seconds: float):
+    """Record end-to-end pipeline latency in seconds"""
+    rag_pipeline_latency.observe(seconds)
+
+
+def record_retrieval_hit(hit: bool):
+    """Record whether retrieval returned at least one result"""
+    rag_retrieval_hit_counter.labels(hit="true" if hit else "false").inc()
+
+
+def record_retriever_topk(top_k: int):
+    """Record distribution of requested top_k values"""
+    try:
+        rag_retriever_topk.observe(float(top_k))
+    except Exception:
+        # Histogram expects numeric values; ignore invalid inputs safely
+        pass
 
 
 # Register metrics with Instrumentator
