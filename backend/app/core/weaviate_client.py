@@ -23,31 +23,20 @@ class WeaviateClient:
         self._connect()
 
     def _connect(self):
-        """Connect to Weaviate instance"""
+        """Connect to Weaviate using v3 client (stable)"""
         try:
-            # Configure Weaviate client
-            try:
-                # Try v4 client first
-                self.client = weaviate.connect_to_local(
-                    host=settings.WEAVIATE_URL.replace("http://", "").replace(
-                        "https://", ""
-                    ),
-                    port=8080,
-                    grpc_port=50051,
+            # Use v3 client consistently
+            client_config = {
+                "url": settings.WEAVIATE_URL,
+            }
+
+            # Add API key if provided
+            if settings.WEAVIATE_API_KEY:
+                client_config["auth_client_secret"] = weaviate.AuthApiKey(
+                    api_key=settings.WEAVIATE_API_KEY
                 )
-            except Exception:
-                # Fallback to v3 client
-                client_config = {
-                    "url": settings.WEAVIATE_URL,
-                }
 
-                # Add API key if provided
-                if settings.WEAVIATE_API_KEY:
-                    client_config["auth_client_secret"] = weaviate.AuthApiKey(
-                        api_key=settings.WEAVIATE_API_KEY
-                    )
-
-                self.client = weaviate.Client(**client_config)
+            self.client = weaviate.Client(**client_config)
 
             # Test connection
             if self.client.is_ready():
@@ -215,13 +204,22 @@ class WeaviateClient:
             )
 
             if result:
+                props = result.get("properties", {})
+
+                # Parse metadata_json field (as defined in schema)
+                metadata = {}
+                try:
+                    metadata = json.loads(props.get("metadata_json") or "{}")
+                except Exception:
+                    pass
+
                 return {
-                    "id": result["id"],
-                    "content": result["properties"]["content"],
-                    "source": result["properties"]["source"],
-                    "metadata": result["properties"]["metadata"],
-                    "query_id": result["properties"]["query_id"],
-                    "created_at": result["properties"]["created_at"],
+                    "id": result.get("id"),
+                    "content": props.get("content"),
+                    "source": props.get("source"),
+                    "metadata": metadata,  # Parsed from metadata_json
+                    "query_id": props.get("query_id"),
+                    "created_at": props.get("created_at"),
                 }
             return None
 

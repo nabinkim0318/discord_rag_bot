@@ -87,7 +87,17 @@ async def query_rag(
             },
         )
 
-        # Store RAG result in Weaviate with query_id
+        # Store RAG result in Weaviate with actual query_id
+        from app.services.rag_service import store_rag_result_in_weaviate
+
+        store_rag_result_in_weaviate(
+            query=request.query,
+            answer=answer,
+            contexts=contexts,
+            metadata=metadata,
+            query_id=str(query_record.id),  # Use actual DB query_id
+        )
+
         dur = perf_counter() - start
         rag_query_counter.labels(method="POST", endpoint="/api/query/").inc()
         rag_query_latency.labels(endpoint="/api/query/").observe(dur)
