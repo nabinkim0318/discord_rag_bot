@@ -137,6 +137,36 @@ precommit-backend:
 precommit-rag:
 	cd rag_agent && poetry run pre-commit run --all-files
 
+# ======== Docker Commands ========
+
+docker-up:
+	docker compose up -d
+
+docker-up-with-bot:
+	docker compose --profile discord up -d
+
+docker-down:
+	docker compose down
+
+docker-build:
+	docker compose build
+
+docker-logs:
+	docker compose logs -f
+
+docker-logs-api:
+	docker compose logs -f api
+
+docker-logs-bot:
+	docker compose logs -f bot
+
+docker-restart:
+	docker compose restart
+
+docker-clean:
+	docker compose down -v --remove-orphans
+	docker system prune -f
+
 # ======== Git Shortcuts ========
 
 commit:

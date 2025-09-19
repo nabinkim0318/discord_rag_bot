@@ -26,10 +26,10 @@ from interactions import (
 from interactions.api.http import Forbidden
 from metrics import RAG_FAILURES, RAG_LATENCY, RAG_TOTAL
 
-BACKEND_BASE = os.environ.get("BACKEND_BASE_URL", "http://localhost:8000")
-DISCORD_TOKEN = os.environ.get("DISCORD_BOT_TOKEN")
+BACKEND_BASE = os.environ.get("API_BASE_URL", "http://api:8001")
+DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
 if not DISCORD_TOKEN:
-    raise RuntimeError("DISCORD_BOT_TOKEN is not set. Check your .env")
+    raise RuntimeError("DISCORD_TOKEN is not set. Check your .env")
 
 
 async def call_backend_query(question: str, user_id: str, top_k: int = 5):
