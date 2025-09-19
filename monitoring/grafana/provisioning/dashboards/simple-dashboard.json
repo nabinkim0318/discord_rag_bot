@@ -143,6 +143,183 @@
         "x": 0,
         "y": 16
       }
+    },
+    {
+      "id": 7,
+      "title": "HTTP Error Rate (5xx)",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))",
+          "refId": "A",
+          "legendFormat": "5xx Error Rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.02},
+              {"color": "red", "value": 0.05}
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 24
+      }
+    },
+    {
+      "id": 8,
+      "title": "RAG Throughput by Endpoint",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "sum(rate(rag_query_total[5m])) by (endpoint)",
+          "refId": "A",
+          "legendFormat": "{{endpoint}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 8,
+        "y": 24
+      }
+    },
+    {
+      "id": 9,
+      "title": "RAG Failure Count by Error Type",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "sum(rate(rag_query_failures[5m])) by (error_type)",
+          "refId": "A",
+          "legendFormat": "{{error_type}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 30
+      }
+    },
+    {
+      "id": 10,
+      "title": "RAG Failure Rate by Endpoint",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "sum(rate(rag_query_failures[5m])) by (endpoint) / sum(rate(rag_query_total[5m])) by (endpoint)",
+          "refId": "A",
+          "legendFormat": "{{endpoint}} Failure Rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 30
+      }
+    },
+    {
+      "id": 11,
+      "title": "Feedback Trends (Up/Down)",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "sum(rate(feedback_total{type=\"up\"}[15m]))",
+          "refId": "A",
+          "legendFormat": "👍 Upvotes"
+        },
+        {
+          "expr": "sum(rate(feedback_total{type=\"down\"}[15m]))",
+          "refId": "B",
+          "legendFormat": "👎 Downvotes"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 38
+      }
+    },
+    {
+      "id": 12,
+      "title": "Positive Feedback Ratio",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(rate(feedback_total{type=\"up\"}[15m])) / (sum(rate(feedback_total{type=\"up\"}[15m])) + sum(rate(feedback_total{type=\"down\"}[15m])))",
+          "refId": "A",
+          "legendFormat": "Positive Ratio"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 0.5},
+              {"color": "green", "value": 0.7}
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 38
+      }
+    },
+    {
+      "id": 13,
+      "title": "Circuit Breaker Status",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "circuit_breaker_state",
+          "refId": "A",
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {"options": {"0": {"text": "CLOSED"}}, "type": "value"},
+            {"options": {"1": {"text": "HALF_OPEN"}}, "type": "value"},
+            {"options": {"2": {"text": "OPEN"}}, "type": "value"}
+          ],
+          "thresholds": {
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "red", "value": 2}
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 46
+      }
     }
   ],
   "time": {

@@ -2,7 +2,7 @@
 Prometheus metric setup
 """
 
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Gauge, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
 
 # Initialize Prometheus FastAPI Instrumentator
@@ -17,6 +17,10 @@ def create_counter(name: str, description: str, labels: list[str] = None):
 
 def create_histogram(name: str, description: str, labels: list[str] = None):
     return Histogram(name, description, labelnames=labels or [])
+
+
+def create_gauge(name: str, description: str, labels: list[str] = None):
+    return Gauge(name, description, labelnames=labels or [])
 
 
 # ==================== RAG Metrics ====================
@@ -54,6 +58,14 @@ rag_retriever_topk = create_histogram(
 
 feedback_counter = create_counter(
     "feedback_total", "Total number of feedbacks received", ["type"]
+)
+
+# ==================== Circuit Breaker Metrics ====================
+
+circuit_breaker_state = create_gauge(
+    "circuit_breaker_state",
+    "Circuit breaker state (0=closed, 1=half_open, 2=open)",
+    ["service"],
 )
 
 # ==================== Health Check Metrics ====================
