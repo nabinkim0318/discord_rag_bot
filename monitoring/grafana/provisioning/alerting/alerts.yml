@@ -1,0 +1,60 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: rag-alerts
+    folder: RAG Alerts
+    interval: 1m
+    rules:
+      - uid: rag_p95_latency_high
+        title: RAG p95 Latency High
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              refId: A
+              expr: histogram_quantile(0.95, sum(rate(rag_pipeline_latency_seconds_bucket[5m])) by (le))
+              format: time_series
+              instant: false
+        noDataState: NoData
+        execErrState: Error
+        annotations:
+          summary: "RAG p95 latency is high"
+        labels:
+          severity: warning
+        for: 5m
+        isPaused: false
+        conditionType: query
+        thresholds:
+          - type: gt
+            value: 5
+      - uid: rag_retrieval_hit_rate_low
+        title: Retrieval Hit Rate Low
+        condition: B
+        data:
+          - refId: B
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              refId: B
+              expr: sum(rate(rag_retrieval_hits_total{hit=\"true\"}[5m])) / sum(rate(rag_retrieval_hits_total[5m]))
+              format: time_series
+              instant: false
+        noDataState: NoData
+        execErrState: Error
+        annotations:
+          summary: "Retrieval hit rate is low"
+        labels:
+          severity: warning
+        for: 5m
+        isPaused: false
+        conditionType: query
+        thresholds:
+          - type: lt
+            value: 0.5

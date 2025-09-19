@@ -24,10 +24,11 @@ services:
     image: grafana/grafana:latest
     container_name: grafana
     ports:
-      - "3001:3000"  # 포트 충돌 해결
+      - "3001:3000"  # port conflict resolution
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin123
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/simple-dashboard.json
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
@@ -47,13 +48,13 @@ services:
       - ./backend:/app
       - ./rag_agent:/app/rag_agent
     ports:
-      - "8001:8001"  # 포트 변경
+      - "8001:8001"  # port change
     command: poetry run uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
     depends_on:
       - rag_agent
     networks:
       - default
-      - monitoring  # Prometheus 메트릭 수집을 위해 monitoring 네트워크 추가
+      - monitoring  # add monitoring network for Prometheus metric collection
 
   rag_agent:
     build:
