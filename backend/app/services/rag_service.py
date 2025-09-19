@@ -10,6 +10,7 @@ from app.core.metrics import (
     record_retrieval_hit,
     record_retriever_topk,
 )
+from app.core.retry import retry_openai, retry_weaviate
 
 
 def get_embedding(query: str) -> List[float]:
@@ -29,6 +30,7 @@ def get_embedding(query: str) -> List[float]:
         raise RAGException(f"Embedding generation failed: {str(e)}")
 
 
+@retry_weaviate(max_attempts=3)
 def search_similar_documents(query: str, top_k: int = 3) -> List[Dict]:
     """
     Search similar documents using Weaviate (with fallback)
@@ -90,6 +92,7 @@ def _mock_document_search(top_k: int) -> List[Dict]:
     ]
 
 
+@retry_openai(max_attempts=3)
 def call_llm(prompt: str) -> str:
     """
     Call LLM (Mock implementation)

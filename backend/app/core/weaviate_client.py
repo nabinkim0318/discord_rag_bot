@@ -11,6 +11,7 @@ import weaviate
 from app.core.config import settings
 from app.core.exceptions import ExternalServiceException
 from app.core.logging import logger
+from app.core.retry import retry_weaviate
 
 
 class WeaviateClient:
@@ -25,17 +26,28 @@ class WeaviateClient:
         """Connect to Weaviate instance"""
         try:
             # Configure Weaviate client
-            client_config = {
-                "url": settings.WEAVIATE_URL,
-            }
-
-            # Add API key if provided
-            if settings.WEAVIATE_API_KEY:
-                client_config["auth_client_secret"] = weaviate.AuthApiKey(
-                    api_key=settings.WEAVIATE_API_KEY
+            try:
+                # Try v4 client first
+                self.client = weaviate.connect_to_local(
+                    host=settings.WEAVIATE_URL.replace("http://", "").replace(
+                        "https://", ""
+                    ),
+                    port=8080,
+                    grpc_port=50051,
                 )
+            except Exception:
+                # Fallback to v3 client
+                client_config = {
+                    "url": settings.WEAVIATE_URL,
+                }
 
-            self.client = weaviate.Client(**client_config)
+                # Add API key if provided
+                if settings.WEAVIATE_API_KEY:
+                    client_config["auth_client_secret"] = weaviate.AuthApiKey(
+                        api_key=settings.WEAVIATE_API_KEY
+                    )
+
+                self.client = weaviate.Client(**client_config)
 
             # Test connection
             if self.client.is_ready():
@@ -132,6 +144,7 @@ class WeaviateClient:
                 f"Failed to add document to Weaviate: {str(e)}", service_name="weaviate"
             )
 
+    @retry_weaviate(max_attempts=3)
     def search_similar(
         self, query: str, top_k: int = 5, where_filter: Optional[Dict] = None
     ) -> List[Dict[str, Any]]:
