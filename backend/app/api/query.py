@@ -62,7 +62,7 @@ async def query_rag(
 
         # Save query result to database
         query_record = Query(
-            user_id=request.user_id if hasattr(request, "user_id") else None,
+            user_id=user_id,  # Use the extracted/override user_id
             query=request.query,
             answer=answer,
             context={

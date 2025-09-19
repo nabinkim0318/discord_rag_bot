@@ -30,14 +30,15 @@ app = FastAPI(
 # Setup error handlers
 setup_error_handlers(app)
 
-# Setup CORS
-allow_origins = settings.CORS_ORIGINS
+# Setup CORS - fix wildcard + credentials conflict
+allow_origins = settings.CORS_ORIGINS.copy()
 allow_credentials = settings.CORS_ALLOW_CREDENTIALS
 
-if allow_credentials and ("*" in allow_origins):
-    # fix: don't allow wildcard with credentials
+# Remove wildcard if credentials are enabled
+if allow_credentials and "*" in allow_origins:
     allow_origins = [o for o in allow_origins if o != "*"]
-    allow_credentials = False
+    # Only allow credentials if we have specific origins
+    allow_credentials = bool(allow_origins)
 
 app.add_middleware(
     CORSMiddleware,
@@ -53,8 +54,9 @@ app.include_router(feedback.router)
 app.include_router(query.router, prefix="/api/query")
 app.include_router(health.router, prefix="/api/v1/health", tags=["Health"])
 
-# Metrics
-instrumentator.instrument(app).expose(app)
+# Metrics - properly configure instrumentator
+if settings.METRICS_ENABLED:
+    instrumentator.instrument(app).expose(app, endpoint=settings.METRICS_PATH)
 
 
 @app.on_event("startup")

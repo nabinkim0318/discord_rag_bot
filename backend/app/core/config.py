@@ -6,10 +6,8 @@ Configuration settings for the RAG Backend API
 from pathlib import Path
 from typing import List, Optional
 
-from pydantic import BaseModel
 
-
-class Settings(BaseModel):
+class Settings:
     """Application settings"""
 
     # ==================== Basic App Settings ====================
@@ -61,11 +59,6 @@ class Settings(BaseModel):
     # ==================== Metrics Settings ====================
     METRICS_ENABLED: bool = True
     METRICS_PATH: str = "/metrics"
-
-    model_config = {
-        "env_file": ".env",
-        "env_file_encoding": "utf-8",
-    }
 
 
 # Global settings instance
