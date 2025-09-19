@@ -42,7 +42,7 @@ def test_health_vector_store():
 def test_query_endpoint_mock(monkeypatch):
     import app.api.query as query_router
 
-    def fake_run_rag_pipeline(query: str, top_k: int = 5):
+    def fake_run_rag_pipeline(query: str, top_k: int = 5, **kwargs):
         return "mock-answer", ["ctx1", "ctx2"], {"num_contexts": 2}
 
     monkeypatch.setattr(query_router, "run_rag_pipeline", fake_run_rag_pipeline)

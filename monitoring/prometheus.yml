@@ -7,20 +7,20 @@ rule_files:
   # - "second_rules.yml"
 
 scrape_configs:
-  # Prometheus 자체 모니터링
+  # Prometheus itself monitoring
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
 
-  # FastAPI 백엔드 메트릭 수집
+  # FastAPI backend metric collection
   - job_name: 'fastapi-backend'
     static_configs:
-      - targets: ['backend:8001']  # Docker 네트워크 내에서 컨테이너 이름으로 접근
+      - targets: ['backend:8001']  # access container name within Docker network
     metrics_path: '/metrics'
     scrape_interval: 10s
     scrape_timeout: 5s
 
-  # Weaviate 메트릭 (만약 활성화되어 있다면)
+  # Weaviate metric (if enabled)
   - job_name: 'weaviate'
     static_configs:
       - targets: ['weaviate:8080']

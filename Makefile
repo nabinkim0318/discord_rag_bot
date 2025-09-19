@@ -37,12 +37,12 @@ lint-rag:
 format: format-backend format-rag
 
 format-backend:
-	cd backend && poetry run black .
 	cd backend && poetry run isort .
+	cd backend && poetry run black .
 
 format-rag:
-	cd rag_agent && poetry run black .
 	cd rag_agent && poetry run isort .
+	cd rag_agent && poetry run black .
 
 test: test-backend test-rag
 
