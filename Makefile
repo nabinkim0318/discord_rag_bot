@@ -49,6 +49,9 @@ test: test-backend test-rag
 test-backend:
 	cd backend && poetry run pytest tests
 
+test-backend-error:
+	cd backend && poetry run pytest tests/test_error_handling.py -v
+
 test-rag:
 	cd rag_agent && poetry run pytest tests
 
