@@ -6,7 +6,7 @@ import LoadingMessage from "./LoadingMessage";
 import { useChat } from "./useChat";
 
 export default function ChatPage() {
-  const { messages, loading, sendMessage } = useChat();
+  const { messages, loading, sendMessage, retryLast, error, setError } = useChat();
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -32,7 +32,11 @@ export default function ChatPage() {
   };
 
   const handleFeedback = (type: "like" | "dislike" | "retry") => {
-    // TODO: Implement feedback functionality
+    if (type === "retry") {
+      retryLast();
+      return;
+    }
+    // TODO: send feedback to backend
     console.log("Feedback:", type);
   };
 
@@ -66,6 +70,28 @@ export default function ChatPage() {
         {loading && <LoadingMessage />}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Error Toast */}
+      {error && (
+        <div className="mx-4 mt-2 p-3 bg-red-50 text-red-700 rounded border border-red-200 flex justify-between items-center">
+          <span>{error}</span>
+          <div className="flex gap-2">
+            <button
+              className="px-3 py-1 text-sm bg-red-600 text-white rounded"
+              onClick={() => retryLast()}
+              disabled={loading}
+            >
+              Retry
+            </button>
+            <button
+              className="px-3 py-1 text-sm border rounded"
+              onClick={() => setError(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Input Area */}
       <div className="border-t p-4">
