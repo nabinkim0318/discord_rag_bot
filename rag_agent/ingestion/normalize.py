@@ -2,16 +2,18 @@
 from __future__ import annotations
 
 import re
+from typing import Iterable, Optional
 
 _BULLET = r"(?:^[\s>*\-•◦▪●·\d]+\)|^[\s>*\-•◦▪●·]+)"  # simple bullet/number prefix
 _URL = r"(https?://[^\s)]+)"
 _EMOJI = r"[\U00010000-\U0010ffff]"  # extended emoji
 
-HEADER_FOOTER_CANDIDATES = [
-    r"^\s*AI\s+Bootcamp\s+.*$",  # document header pattern (example)
+DEFAULT_HEADER_FOOTER_CANDIDATES = [
+    r"^\s*AI\s+Bootcamp\s+.*$",
     r"^\s*Intern\s+FAQ\s+.*$",
     r"^\s*Training\s+For\s+AI\s+Engineer\s+Interns\s*$",
 ]
+
 PAGE_NUMBER_PATTERNS = [
     r"^\s*\d+\s*$",  # only number in a line
     r"^\s*page\s*\d+\s*$",  # "Page 12"
@@ -19,13 +21,16 @@ PAGE_NUMBER_PATTERNS = [
 ]
 
 
-def strip_header_footer(lines: list[str]) -> list[str]:
+def strip_header_footer(
+    lines: list[str], header_footer_patterns: Optional[Iterable[str]] = None
+) -> list[str]:
+    hf = list(header_footer_patterns or DEFAULT_HEADER_FOOTER_CANDIDATES)
     new = []
     for ln in lines:
-        # remove page number/header/footer candidates
-        if any(re.match(pat, ln.strip(), re.I) for pat in PAGE_NUMBER_PATTERNS):
+        s = ln.strip()
+        if any(re.match(p, s, re.I) for p in PAGE_NUMBER_PATTERNS):
             continue
-        if any(re.match(pat, ln.strip(), re.I) for pat in HEADER_FOOTER_CANDIDATES):
+        if any(re.match(p, s, re.I) for p in hf):
             continue
         new.append(ln)
     return new
@@ -56,12 +61,18 @@ def remove_emojis(s: str) -> str:
     return re.sub(_EMOJI, "", s)
 
 
-def normalize_text(raw: str) -> str:
+def normalize_text(
+    raw: str,
+    *,
+    header_footer_patterns: Optional[Iterable[str]] = None,
+    remove_emoji: bool = True,
+    remove_bullet: bool = True,
+) -> str:
     if not raw:
         return ""
     # 1) remove header/footer/page number (line by line)
     lines = raw.splitlines()
-    lines = strip_header_footer(lines)
+    lines = strip_header_footer(lines, header_footer_patterns)
     s = "\n".join(lines)
 
     # 2) remove bullet
