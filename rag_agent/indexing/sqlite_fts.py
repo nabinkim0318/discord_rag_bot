@@ -143,9 +143,9 @@ def bm25_search(
   ORDER BY score LIMIT ?;
   """
     with connect(db_path) as con:
-        con.create_function(
-            "bm25", 1, lambda x: x
-        )  # FTS5 builtin function alias safety
+        # con.create_function(
+        #     "bm25", 1, lambda x: x
+        # )  # FTS5 builtin function alias safety
         cur = con.execute(sql, (query, k))
         out = []
         for row in cur.fetchall():

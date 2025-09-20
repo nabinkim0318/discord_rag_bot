@@ -112,7 +112,7 @@ def load_pdf_to_pages(
 
     # sample 500 chars preview
     if preview and records:
-        sample = records[min(0, len(records) - 1)]
+        sample = records[0]
         log.info(
             "[loader] %s p%d preview: %s",
             source,
