@@ -159,5 +159,12 @@ def record_retriever_topk(top_k: int):
         pass
 
 
+def record_prompt_version(prompt_version: str):
+    """Record prompt version usage"""
+    # For now, just a placeholder function
+    # Could be implemented as a counter if needed
+    pass
+
+
 # Register metrics with Instrumentator
 instrumentator.add(rag_query_metric)
