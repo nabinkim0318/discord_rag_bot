@@ -22,6 +22,10 @@ def main():
     ap.add_argument("--mmr", type=float, default=0.65)
     ap.add_argument("--max-cases", type=int, default=None)
     ap.add_argument("--out-dir", default="rag_agent/evaluation_results")
+    # evaluation thresholds
+    ap.add_argument("--ndcg-threshold", type=float, default=0.6)
+    ap.add_argument("--hit-rate-threshold", type=float, default=0.8)
+    ap.add_argument("--latency-threshold", type=float, default=1000.0)
     args = ap.parse_args()
 
     cfg = EvaluationConfig(
@@ -34,6 +38,9 @@ def main():
         mmr_lambda=args.mmr,
         max_cases=args.max_cases,
         out_dir=args.out_dir,
+        ndcg_threshold=args.ndcg_threshold,
+        hit_rate_threshold=args.hit_rate_threshold,
+        latency_threshold_ms=args.latency_threshold,
     )
 
     per_case, summary = run_evaluation(args.gold, cfg)
@@ -45,10 +52,13 @@ def main():
     for k, v in paths.items():
         print(f"- {k}: {v}")
 
-    # Failure standard (example): nDCG < 0.6 then fail
-    if summary.ndcg_at_k_mean < 0.6:
+    # Use the new threshold-based pass/fail logic
+    if not summary.passed:
+        print(f"\n❌ Evaluation FAILED: {summary.failure_reason}")
         sys.exit(1)
-    sys.exit(0)
+    else:
+        print("\n✅ Evaluation PASSED")
+        sys.exit(0)
 
 
 if __name__ == "__main__":

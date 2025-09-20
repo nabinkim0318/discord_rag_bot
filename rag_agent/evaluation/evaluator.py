@@ -30,6 +30,10 @@ class EvaluationConfig:
     mmr_lambda: float = 0.65
     max_cases: Optional[int] = None  # When sampling evaluation
     out_dir: str = "rag_agent/evaluation_results"
+    # evaluation thresholds
+    ndcg_threshold: float = 0.6  # nDCG threshold for pass/fail
+    hit_rate_threshold: float = 0.8  # hit rate threshold
+    latency_threshold_ms: float = 1000.0  # latency threshold
 
 
 @dataclass
@@ -60,6 +64,10 @@ class EvalSummary:
     map_at_k_mean: float
     avg_latency_ms: float
     hit_rate: float  # top-k contains relevant
+    # threshold and pass/fail results
+    ndcg_threshold: float = 0.6  # default threshold
+    passed: bool = False  # whether evaluation passed
+    failure_reason: Optional[str] = None  # reason for failure if any
 
 
 def _apply_filters_to_hybrid_args(filters: Optional[Dict[str, Any]]):
@@ -169,6 +177,26 @@ def run_evaluation(
     lat_mean = mean(latencies)
     hit_rate = hit_count / len(per_case) if per_case else 0.0
 
+    # threshold check
+    passed = True
+    failure_reasons = []
+
+    if ndcg_mean < cfg.ndcg_threshold:
+        passed = False
+        failure_reasons.append(f"nDCG {ndcg_mean:.3f} < threshold {cfg.ndcg_threshold}")
+
+    if hit_rate < cfg.hit_rate_threshold:
+        passed = False
+        failure_reasons.append(
+            f"Hit rate {hit_rate:.3f} < threshold {cfg.hit_rate_threshold}"
+        )
+
+    if lat_mean > cfg.latency_threshold_ms:
+        passed = False
+        failure_reasons.append(
+            f"Latency {lat_mean:.1f}ms > threshold {cfg.latency_threshold_ms}ms"
+        )
+
     summary = EvalSummary(
         total=len(per_case),
         p_at_k_mean=p_mean,
@@ -178,6 +206,9 @@ def run_evaluation(
         map_at_k_mean=map_mean,
         avg_latency_ms=lat_mean,
         hit_rate=hit_rate,
+        ndcg_threshold=cfg.ndcg_threshold,
+        passed=passed,
+        failure_reason="; ".join(failure_reasons) if failure_reasons else None,
     )
     return per_case, summary
 
@@ -208,6 +239,12 @@ def dump_results(
         "rag_eval_map_at_k": summary.map_at_k_mean,
         "rag_eval_hit_rate": summary.hit_rate,
         "rag_eval_avg_latency_ms": summary.avg_latency_ms,
+        # threshold and pass/fail results
+        "rag_eval_ndcg_threshold": summary.ndcg_threshold,
+        "rag_eval_passed": summary.passed,
+        "rag_eval_failure_reason": summary.failure_reason,
+        # CI-friendly pass/fail status
+        "rag_eval_status": "PASS" if summary.passed else "FAIL",
     }
     with open(metrics_path, "w", encoding="utf-8") as fo:
         json.dump(metrics, fo, indent=2)

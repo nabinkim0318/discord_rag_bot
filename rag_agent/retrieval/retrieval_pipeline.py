@@ -68,6 +68,9 @@ def search_hybrid(
     weaviate_filters: Optional[Dict[str, Any]] = None,
     embed_model: Optional[str] = None,
     mmr_lambda: float = 0.6,
+    # weights for RRF combination
+    bm25_weight: float = 1.0,
+    vec_weight: float = 1.0,
     # metrics/options
     record_latency: bool = True,
     metrics_endpoint: str = "/api/v1/rag/retrieval",
@@ -107,8 +110,12 @@ def search_hybrid(
     _peek("bm25", bm, "score_bm25")
     _peek("vec", ve, "score_vec")
 
-    # ── RRF + MMR
-    fused = rrf_combine([bm, ve], score_keys=["score_bm25", "score_vec"])
+    # ── RRF + MMR (with weights)
+    fused = rrf_combine(
+        [bm, ve],
+        score_keys=["score_bm25", "score_vec"],
+        weights=[bm25_weight, vec_weight],
+    )
     mmr = mmr_select(fused, lambda_=mmr_lambda, topn=top_k_final, text_key="content")
 
     # ── record metrics
