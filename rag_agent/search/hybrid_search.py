@@ -1,0 +1,238 @@
+# rag_agent/search/hybrid_search.py
+from __future__ import annotations
+
+import json
+import os
+from typing import Any, Dict, List, Optional
+
+from rag_agent.indexing.embeddings import embed_texts
+from rag_agent.indexing.sqlite_fts import bm25_search
+from rag_agent.search.mmr import mmr_rerank
+
+# Weaviate v3 client used
+try:
+    import weaviate
+except Exception:
+    weaviate = None
+
+# Reuse backend settings (WEAVIATE_URL, WEAVIATE_API_KEY)
+try:
+    from app.core.config import settings
+except Exception:
+
+    class _S:  # For standalone execution
+        WEAVIATE_URL = os.getenv("WEAVIATE_URL", "http://localhost:8080")
+        WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY")
+
+    settings = _S()
+
+CLASS_NAME = "KBChunk"  # Match the class name created in C-step
+
+
+# ---------- Utils ----------
+def _min_max_norm(vals: List[float]) -> List[float]:
+    if not vals:
+        return vals
+    lo, hi = min(vals), max(vals)
+    if hi - lo < 1e-12:  # All the same
+        return [0.5 for _ in vals]
+    return [(v - lo) / (hi - lo) for v in vals]
+
+
+def _weaviate_client():
+    if weaviate is None:
+        raise RuntimeError("weaviate is not installed")
+    cfg = {"url": settings.WEAVIATE_URL}
+    if getattr(settings, "WEAVIATE_API_KEY", None):
+        cfg["auth_client_secret"] = weaviate.AuthApiKey(
+            api_key=settings.WEAVIATE_API_KEY
+        )
+    return weaviate.Client(**cfg)
+
+
+# ---------- Vector Search ----------
+def vector_search_weaviate_by_query_vec(
+    query_vec: List[float],
+    *,
+    top_k: int = 20,
+    where_filter: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Search KBChunk by nearVector (vectorizer: none)
+    Return: [{chunk_uid, content, source, doc_id, chunk_id,
+    page, metadata, vec_score}, ...]
+    """
+    c = _weaviate_client()
+    try:
+        qb = (
+            c.query.get(
+                CLASS_NAME,
+                [
+                    "content",
+                    "source",
+                    "doc_id",
+                    "chunk_id",
+                    "page",
+                    "chunk_uid",
+                    "metadata_json",
+                ],
+            )
+            .with_near_vector({"vector": query_vec})
+            .with_limit(top_k)
+            .with_additional(
+                ["id", "distance"]
+            )  # cosine distance(0=identical, 2=opposite) or dot based on settings
+        )
+        if where_filter:
+            qb = qb.with_where(where_filter)
+
+        res = qb.do()
+        items = res.get("data", {}).get("Get", {}).get(CLASS_NAME, []) or []
+        out = []
+        for it in items:
+            md = {}
+            try:
+                md = json.loads(it.get("metadata_json") or "{}")
+            except Exception:
+                md = {}
+
+            # distance → similarity (cosine distance assumed)
+            dist = it["_additional"].get("distance")
+            # Weaviate cosine distance range: [0, 2] (0=identical, 2=opposite)
+            # sim ~= 1 - dist/2 mapping
+            sim = 1.0 - float(dist or 1.0) / 2.0
+
+            out.append(
+                {
+                    "chunk_uid": it.get("chunk_uid"),
+                    "content": it.get("content"),
+                    "source": it.get("source"),
+                    "doc_id": it.get("doc_id"),
+                    "chunk_id": it.get("chunk_id"),
+                    "page": it.get("page"),
+                    "metadata": md,
+                    "vec_score": sim,
+                }
+            )
+        return out
+    finally:
+        c.close()
+
+
+# ---------- Hybrid Search (BM25 + Vector) ----------
+def hybrid_retrieve(
+    query: str,
+    *,
+    sqlite_path: str,
+    k_bm25: int = 20,
+    k_vec: int = 20,
+    k_final: int = 8,
+    bm25_weight: float = 0.4,
+    vec_weight: float = 0.6,
+    mmr_lambda: float = 0.65,
+    where_fts: Optional[str] = None,  # e.g. "source='Intern FAQ - AI Bootcamp.pdf'"
+    weaviate_where: Optional[
+        Dict[str, Any]
+    ] = None,  # Same filter applied to vector side
+) -> List[Dict[str, Any]]:
+    """
+    1) FTS5 BM25 top-k
+    2) Embedding -> Weaviate nearVector top-k
+    3) Normalize + weighted sum for base score
+    4) MMR for final k_final reranking
+    Return: [{chunk_uid, content, source, doc_id,
+    chunk_id, page, score, bm25, vec_score}, ...]
+    """
+    # --- 1) BM25 ---
+    bm25_hits = bm25_search(sqlite_path, query, k=k_bm25, where=where_fts)
+    # BM25 score is "smaller is better" so we need to invert it.
+    # sqlite fts5's bm25() value is smaller means higher relevance →
+    # convert to similarity-like larger is better
+    if bm25_hits:
+        raw = [h["bm25"] for h in bm25_hits]
+        # Invert/normalize: smaller value=larger score
+        # First min-max normalize then invert 1-x is straightforward
+        mm = _min_max_norm(raw)  # smaller value=0, larger value=1
+        bm25_norm = [1.0 - v for v in mm]  # smaller bm25 → larger score
+    else:
+        bm25_norm = []
+
+    bm25_map = {}  # chunk_uid → (payload, norm_score)
+    for h, s in zip(bm25_hits, bm25_norm):
+        bm25_map[h["chunk_uid"]] = (
+            {
+                "chunk_uid": h["chunk_uid"],
+                "content": h["text"],
+                "source": h.get("source"),
+                "doc_id": h.get("doc_id"),
+                "chunk_id": h.get("chunk_id"),
+                "page": h.get("page"),
+            },
+            s,
+        )
+
+    # --- 2) Vector top-k ---
+    [query_vec] = embed_texts([query])  # Query embedding
+    vec_hits = vector_search_weaviate_by_query_vec(
+        query_vec, top_k=k_vec, where_filter=weaviate_where
+    )
+
+    # vec_score itself is mapped to [0..1] so additional normalization
+    # is optional (norm again for scale stability)
+    vec_raw = [h["vec_score"] for h in vec_hits]
+    vec_norm = _min_max_norm(vec_raw) if vec_raw else []
+    vec_map = {h["chunk_uid"]: (h, s) for h, s in zip(vec_hits, vec_norm)}
+
+    # --- 3) Merge candidates + base score (weighted sum) ---
+    # Merge by same chunk_uid
+    all_uids = set(bm25_map.keys()) | set(vec_map.keys())
+    merged = []
+    for uid in all_uids:
+        b_payload, b_s = bm25_map.get(uid, ({}, 0.0))
+        v_payload, v_s = vec_map.get(uid, ({}, 0.0))
+
+        # content/source etc. is used if filled from either side
+        payload = (
+            b_payload
+            if b_payload
+            else {
+                "chunk_uid": v_payload.get("chunk_uid"),
+                "content": v_payload.get("content"),
+                "source": v_payload.get("source"),
+                "doc_id": v_payload.get("doc_id"),
+                "chunk_id": v_payload.get("chunk_id"),
+                "page": v_payload.get("page"),
+            }
+        )
+
+        combined = bm25_weight * b_s + vec_weight * v_s
+        payload.update(
+            {
+                "bm25": b_s,
+                "vec_score": v_s,
+                "combined": combined,
+            }
+        )
+        merged.append(payload)
+
+    if not merged:
+        return []
+
+    # --- 4) MMR reranking: diversity ---
+    # MMR needs similarity between documents → need candidate text embedding
+    cand_texts = [m["content"] for m in merged]
+    cand_vecs = embed_texts(cand_texts)
+
+    # Choose final k_final candidates with MMR
+    # (similarity is query_vec vs cand_vec)
+    reranked = mmr_rerank(
+        query_vec=query_vec,
+        cand_vecs=cand_vecs,
+        cand_payloads=merged,
+        k=k_final,
+        lambda_=mmr_lambda,
+    )
+
+    # Sort by score in descending order (for convenience)
+    reranked.sort(key=lambda x: x.get("combined", 0.0), reverse=True)
+    return reranked
