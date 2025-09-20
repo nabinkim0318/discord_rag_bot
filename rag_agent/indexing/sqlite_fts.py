@@ -175,3 +175,25 @@ def table_count(db_path: str) -> int:
     with connect(db_path) as con:
         cur = con.execute("SELECT COUNT(*) FROM chunks;")
         return int(cur.fetchone()[0])
+
+
+def get_by_chunk_uid(db_path: str, chunk_uid: str) -> Optional[Dict[str, Any]]:
+    sql = """
+      SELECT doc_id, chunk_id, chunk_uid, text, title, section, page, source
+      FROM chunks WHERE chunk_uid = ? LIMIT 1
+    """
+    with connect(db_path) as con:
+        cur = con.execute(sql, (chunk_uid,))
+        row = cur.fetchone()
+        if not row:
+            return None
+        return {
+            "doc_id": row[0],
+            "chunk_id": row[1],
+            "chunk_uid": row[2],
+            "text": row[3],
+            "title": row[4],
+            "section": row[5],
+            "page": row[6],
+            "source": row[7],
+        }
