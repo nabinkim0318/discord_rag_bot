@@ -5,12 +5,13 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
-from backend.app.core.metrics import (
+from app.core.metrics import (
     record_failure_metric,
     record_rag_pipeline_latency,
     record_retrieval_hit,
     record_retriever_topk,
 )
+
 from rag_agent.retrieval.fuse import mmr_select, rrf_combine
 from rag_agent.retrieval.keyword import bm25_search
 from rag_agent.retrieval.vector import vector_search
