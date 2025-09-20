@@ -1,5 +1,12 @@
 # scripts/preview_extract.py
-from rag_agent.ingestion.loader import load_many_pdfs
+import sys
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+from rag_agent.ingestion.loader import load_many_pdfs  # noqa: E402
 
 
 def preview(records, n=3, preview_chars=500):
@@ -16,9 +23,9 @@ def preview(records, n=3, preview_chars=500):
 
 if __name__ == "__main__":
     pdfs = [
-        "rag_agent/data/raw_docs/AI Bootcamp Journey & Learning Path.docx (1).pdf",
-        "rag_agent/data/raw_docs/Intern FAQ - AI Bootcamp (2).pdf",
-        "rag_agent/data/raw_docs/Training For AI Engineer Interns (2).pdf",
+        "data/raw_docs/AI Bootcamp Journey & Learning Path.docx.pdf",
+        "data/raw_docs/Intern FAQ - AI Bootcamp.pdf",
+        "data/raw_docs/Training For AI Engineer Interns.pdf",
     ]
     records = load_many_pdfs(pdfs)
     preview(records, n=5)
