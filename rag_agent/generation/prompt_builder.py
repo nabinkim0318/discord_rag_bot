@@ -6,6 +6,9 @@ import random
 from datetime import datetime
 from typing import Any, Dict, List
 
+from app.core.logging import logger
+from app.core.metrics import record_prompt_version
+
 
 class PromptBuilder:
     """prompt version management and template builder"""
@@ -36,6 +39,8 @@ class PromptBuilder:
         version = version or self.current_version
         prompt_func = self.prompt_versions.get(version, self._build_v1_1_prompt)
 
+        record_prompt_version(version)
+
         prompt = prompt_func(contexts, query, **kwargs)
 
         return {
@@ -51,6 +56,10 @@ class PromptBuilder:
 
     def _build_v1_prompt(self, contexts: List[str], query: str, **kwargs) -> str:
         """basic prompt v1.0"""
+        logger.debug(
+            f"Building prompt v1.0 with {len(contexts)} contexts and "
+            f"{len(query)} query length"
+        )
         context_text = "\n".join([f"- {ctx}" for ctx in contexts])
         return f"""Context Documents:
 {context_text}
