@@ -7,16 +7,13 @@ import os
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
 from interactions import Client, Intents
 
 # add project root to Python path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-# load environment variables from project root
-
-load_dotenv(project_root / ".env")
+# Note: Environment variables should be set manually or via .env file
 
 
 async def main():

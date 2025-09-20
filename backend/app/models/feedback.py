@@ -33,6 +33,7 @@ class Feedback(SQLModel, table=True):
 class FeedbackRequest(BaseModel):
     query_id: str
     feedback_type: FeedbackType  # API input is feedback_type
+    comment: Optional[str] = None
 
 
 class FeedbackResponse(BaseModel):

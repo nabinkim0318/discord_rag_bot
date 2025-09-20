@@ -180,6 +180,7 @@ def hybrid_retrieve_v2(
             "source": item.get("source"),
             "doc_id": item.get("doc_id"),
             "chunk_id": item.get("chunk_id"),
+            "text": item.get("content"),
             "page": item.get("page"),
             "combined": item["score"],  # RRF+MMR final score
             "bm25": 0.0,  # RRF is hard to separate individual scores

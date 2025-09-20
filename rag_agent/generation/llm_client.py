@@ -1,11 +1,18 @@
 # rag_agent/generation/llm_client.py
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from typing import Generator, Optional
 
 from app.core.config import settings
 from app.core.logging import logger
 from app.core.retry import retry_openai
+
+# backend 디렉토리를 Python 경로에 추가
+backend_dir = Path(__file__).parent.parent.parent / "backend"
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
 
 try:
     # OpenAI SDK 1.x

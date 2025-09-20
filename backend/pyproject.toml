@@ -18,7 +18,7 @@ prometheus-fastapi-instrumentator = "^7.1.0"
 # rag_agent = { path = "../rag_agent", develop = true }  # Docker 빌드 시 주석 처리
 sqlmodel = "^0.0.24"
 alembic = "^1.16.5"
-weaviate-client = "^4.0.0"
+weaviate-client = "3.25.3"
 openai = "^1.0.0"
 discord-py-interactions = "^5.15.0"
 psycopg2-binary = "^2.9.10"

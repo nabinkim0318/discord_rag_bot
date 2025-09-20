@@ -25,28 +25,22 @@ class WeaviateClient:
     def _connect(self):
         """Connect to Weaviate using v3 client (stable)"""
         try:
-            # Use v3 client consistently
-            client_config = {
-                "url": settings.WEAVIATE_URL,
-            }
-
-            # Add API key if provided
-            if settings.WEAVIATE_API_KEY:
-                client_config["auth_client_secret"] = weaviate.AuthApiKey(
-                    api_key=settings.WEAVIATE_API_KEY
-                )
-
-            self.client = weaviate.Client(**client_config)
-
-            # Test connection
+            # v3 클라이언트
+            self.client = weaviate.Client(
+                url=settings.WEAVIATE_URL,
+                auth_client_secret=(
+                    weaviate.AuthApiKey(api_key=settings.WEAVIATE_API_KEY)
+                    if settings.WEAVIATE_API_KEY
+                    else None
+                ),
+            )
             if self.client.is_ready():
-                logger.info("Connected to Weaviate at {}", settings.WEAVIATE_URL)
+                logger.info(f"Connected to Weaviate at {settings.WEAVIATE_URL}")
                 self._setup_schema()
             else:
                 raise ExternalServiceException(
                     "Weaviate connection failed", service_name="weaviate"
                 )
-
         except Exception as e:
             logger.error(f"Failed to connect to Weaviate: {str(e)}")
             raise ExternalServiceException(
@@ -239,5 +233,17 @@ class WeaviateClient:
             return False
 
 
-# Global Weaviate client instance
-weaviate_client = WeaviateClient()
+# Global Weaviate client instance (lazy loading)
+weaviate_client = None
+
+
+def get_weaviate_client():
+    """Get Weaviate client instance (lazy loading)"""
+    global weaviate_client
+    if weaviate_client is None:
+        try:
+            weaviate_client = WeaviateClient()
+        except Exception as e:
+            logger.warning(f"Failed to initialize Weaviate client: {e}")
+            weaviate_client = None
+    return weaviate_client

@@ -3,11 +3,18 @@
 # → ✅ example: build_prompt(context, query) → str
 
 import random
+import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List
 
 from app.core.logging import logger
 from app.core.metrics import record_prompt_version
+
+# backend 디렉토리를 Python 경로에 추가
+backend_dir = Path(__file__).parent.parent.parent / "backend"
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
 
 
 class PromptBuilder:

@@ -1,6 +1,8 @@
 # rag_agent/generation/generation_pipeline.py
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
 from rag_agent.generation.context_packer import pack_contexts, render_context_block
@@ -10,6 +12,11 @@ from rag_agent.retrieval.reranker import maybe_rerank
 from rag_agent.search.hybrid_search import hybrid_retrieve
 
 from app.core.config import settings
+
+# backend 디렉토리를 Python 경로에 추가
+backend_dir = Path(__file__).parent.parent.parent / "backend"
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
 
 
 def generate_answer(

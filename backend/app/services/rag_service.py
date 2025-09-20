@@ -3,9 +3,6 @@ import random
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-# Import generate_answer from rag_agent
-from rag_agent.generation.generation_pipeline import generate_answer
-
 from app.core.exceptions import RAGException
 from app.core.logging import log_rag_operation, logger
 from app.core.metrics import (
@@ -14,6 +11,59 @@ from app.core.metrics import (
     record_retriever_topk,
 )
 from app.core.retry import retry_openai, retry_weaviate
+
+# Note: generate_answer import removed to avoid rag_agent dependency
+
+
+def generate_answer(
+    query: str,
+    *,
+    k_bm25: int = 20,
+    k_vec: int = 20,
+    k_final: int = 8,
+    bm25_weight: float = 0.4,
+    vec_weight: float = 0.6,
+    mmr_lambda: float = 0.65,
+    reranker: Optional[str] = None,
+    prompt_version: str = "v1.1",
+    stream: bool = False,
+    filters_fts: Optional[str] = None,
+    filters_weaviate: Optional[Dict[str, Any]] = None,
+) -> Tuple[str, List[Dict[str, Any]], Dict[str, Any]]:
+    """
+    Mock implementation of generate_answer to avoid rag_agent dependency.
+    In a real implementation, this would use the full RAG pipeline.
+    """
+    logger.warning("Using mock generate_answer - rag_agent not available")
+
+    # Mock response
+    answer = f"Mock response for query: {query[:50]}..."
+    used_hits = [
+        {
+            "chunk_uid": "mock-chunk-1",
+            "text": f"Mock context 1 for query: {query[:30]}...",
+            "score": 0.95,
+            "source": "mock_document.pdf",
+            "metadata": {"page": 1, "section": "introduction"},
+        },
+        {
+            "chunk_uid": "mock-chunk-2",
+            "text": f"Mock context 2 for query: {query[:30]}...",
+            "score": 0.87,
+            "source": "mock_document.pdf",
+            "metadata": {"page": 2, "section": "details"},
+        },
+    ]
+    metadata = {
+        "mock": True,
+        "query": query,
+        "k_bm25": k_bm25,
+        "k_vec": k_vec,
+        "k_final": k_final,
+        "prompt_version": prompt_version,
+    }
+
+    return answer, used_hits, metadata
 
 
 def get_embedding(query: str) -> List[float]:

@@ -27,6 +27,7 @@ def upgrade() -> None:
         "feedback",
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("query_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("user_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("feedback", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("comment", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False),
