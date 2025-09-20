@@ -2,16 +2,16 @@
 from __future__ import annotations
 
 import random
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from rag_agent.indexing.embeddings import embed_texts
-from rag_agent.indexing.sqlite_fts import (
-    fts_count,
-    init_sqlite,
-    table_count,
-    upsert_chunks,
-)
-from rag_agent.indexing.weaviate_index import ensure_schema, upsert_chunks_with_vectors
+from rag_agent.indexing.sqlite_fts import fts_count, get_by_chunk_uid, init_sqlite
+from rag_agent.indexing.sqlite_fts import table_count
+from rag_agent.indexing.sqlite_fts import table_count as sqlite_table_count
+from rag_agent.indexing.sqlite_fts import upsert_chunks
+from rag_agent.indexing.weaviate_index import ensure_schema, fetch_by_chunk_uid
+from rag_agent.indexing.weaviate_index import get_count as weaviate_count
+from rag_agent.indexing.weaviate_index import upsert_chunks_with_vectors
 
 
 def _rows_from_chunks(
@@ -127,3 +127,45 @@ def sample_chunk_uids(chunks: List[Dict[str, Any]], n: int = 5) -> List[str]:
         if "chunk_id" in m
     ]
     return random.sample(ids, min(n, len(ids)))
+
+
+def verify_sync(
+    sqlite_path: str,
+    sample_chunk_uids: List[str],
+    *,
+    require_equal_counts: bool = True,
+    max_mismatch_log: int = 5,
+) -> Tuple[bool, Dict[str, Any]]:
+    """
+    - compare total counts (optional)
+    - check if same chunk_uid exists in SQLite/Weaviate
+    """
+    res: Dict[str, Any] = {"count_sqlite": None, "count_weaviate": None, "mismatch": []}
+    ok = True
+    try:
+        cs = sqlite_table_count(sqlite_path)
+        cw = weaviate_count()
+        res["count_sqlite"] = cs
+        res["count_weaviate"] = cw
+        if require_equal_counts and cs != cw:
+            ok = False
+    except Exception as e:
+        ok = False
+        res["error_count"] = str(e)
+
+    try:
+        w_items = fetch_by_chunk_uid(sample_chunk_uids)
+        mism = []
+        for cu in sample_chunk_uids:
+            s = get_by_chunk_uid(sqlite_path, cu)
+            w = w_items.get(cu)
+            if (s is None) or (w is None):
+                mism.append({"chunk_uid": cu, "sqlite": bool(s), "weaviate": bool(w)})
+        if mism:
+            ok = False
+            res["mismatch"] = mism[:max_mismatch_log]
+    except Exception as e:
+        ok = False
+        res["error_lookup"] = str(e)
+
+    return ok, res
