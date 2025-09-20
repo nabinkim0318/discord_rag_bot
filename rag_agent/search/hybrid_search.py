@@ -5,7 +5,15 @@ import json
 import os
 from typing import Any, Dict, List, Optional
 
-from rag_agent.indexing.embeddings import embed_texts
+try:
+    from rag_agent.indexing.embeddings import embed_texts
+except ImportError:
+    # fallback for standalone execution
+    def embed_texts(texts):
+        # dummy implementation - should be replaced with actual embedding
+        return [[0.0] * 384 for _ in texts]
+
+
 from rag_agent.indexing.sqlite_fts import bm25_search
 from rag_agent.search.mmr import mmr_rerank
 
@@ -17,7 +25,7 @@ except Exception:
 
 # Reuse backend settings (WEAVIATE_URL, WEAVIATE_API_KEY)
 try:
-    from app.core.config import settings
+    from backend.app.core.config import settings
 except Exception:
 
     class _S:  # For standalone execution
@@ -119,6 +127,72 @@ def vector_search_weaviate_by_query_vec(
         c.close()
 
 
+# ---------- Adapter for new retrieval pipeline ----------
+def hybrid_retrieve_v2(
+    query: str,
+    *,
+    sqlite_path: str,
+    k_bm25: int = 20,
+    k_vec: int = 20,
+    k_final: int = 8,
+    bm25_weight: float = 0.4,
+    vec_weight: float = 0.6,
+    mmr_lambda: float = 0.65,
+    where_fts: Optional[str] = None,
+    weaviate_where: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Adapter: use new retrieval pipeline but maintain existing signature
+    Weight parameters are used for fine-tuning in RRF+MMR structure
+    Weight parameters are used for fine-tuning in RRF+MMR structure
+    """
+    from rag_agent.retrieval.retrieval_pipeline import search_hybrid
+
+    # where_fts to sqlite_filters
+    sqlite_filters = None
+    if where_fts:
+        # simple parsing: "source='file.pdf'" -> {"source": "file.pdf"}
+        if "=" in where_fts:
+            parts = where_fts.split("=", 1)
+            if len(parts) == 2:
+                key = parts[0].strip()
+                value = parts[1].strip().strip("'\"")
+                sqlite_filters = {key: value}
+
+    # New pipeline call (with weights)
+    results = search_hybrid(
+        query,
+        db_path=sqlite_path,
+        k_bm25=k_bm25,
+        k_vec=k_vec,
+        top_k_final=k_final,
+        sqlite_filters=sqlite_filters,
+        weaviate_filters=weaviate_where,
+        mmr_lambda=mmr_lambda,
+        bm25_weight=bm25_weight,
+        vec_weight=vec_weight,
+        record_latency=False,  # disable metrics for evaluation
+    )
+
+    # Convert to legacy format (score -> combined, add bm25/vec_score)
+    converted = []
+    for item in results:
+        converted_item = {
+            "chunk_uid": item["chunk_uid"],
+            "content": item["content"],
+            "source": item.get("source"),
+            "doc_id": item.get("doc_id"),
+            "chunk_id": item.get("chunk_id"),
+            "page": item.get("page"),
+            "combined": item["score"],  # RRF+MMR final score
+            "bm25": 0.0,  # RRF is hard to separate individual scores
+            "vec_score": 0.0,  # RRF is hard to separate individual scores
+        }
+        converted.append(converted_item)
+
+    return converted
+
+
 # ---------- Hybrid Search (BM25 + Vector) ----------
 def hybrid_retrieve(
     query: str,
@@ -136,6 +210,48 @@ def hybrid_retrieve(
     ] = None,  # Same filter applied to vector side
 ) -> List[Dict[str, Any]]:
     """
+    Hybrid search - use new RRF+MMR pipeline
+    but maintain existing signature internally
+
+    Args:
+        bm25_weight, vec_weight: RRF+MMR structure only for fine-tuning
+        (actual weights are automatically calculated in RRF)
+
+    Return: [{chunk_uid, content, source, doc_id,
+    chunk_id, page, combined, bm25, vec_score}, ...]
+    """
+    # use new pipeline (call adapter function)
+    return hybrid_retrieve_v2(
+        query,
+        sqlite_path=sqlite_path,
+        k_bm25=k_bm25,
+        k_vec=k_vec,
+        k_final=k_final,
+        bm25_weight=bm25_weight,
+        vec_weight=vec_weight,
+        mmr_lambda=mmr_lambda,
+        where_fts=where_fts,
+        weaviate_where=weaviate_where,
+    )
+
+
+def hybrid_retrieve_legacy(
+    query: str,
+    *,
+    sqlite_path: str,
+    k_bm25: int = 20,
+    k_vec: int = 20,
+    k_final: int = 8,
+    bm25_weight: float = 0.4,
+    vec_weight: float = 0.6,
+    mmr_lambda: float = 0.65,
+    where_fts: Optional[str] = None,  # e.g. "source='Intern FAQ - AI Bootcamp.pdf'"
+    weaviate_where: Optional[
+        Dict[str, Any]
+    ] = None,  # Same filter applied to vector side
+) -> List[Dict[str, Any]]:
+    """
+    Legacy hybrid search (existing implementation)
     1) FTS5 BM25 top-k
     2) Embedding -> Weaviate nearVector top-k
     3) Normalize + weighted sum for base score

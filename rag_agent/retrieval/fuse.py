@@ -10,24 +10,28 @@ def rrf_combine(
     *,
     k: int = 60,
     score_keys: List[str] | None = None,
+    weights: List[float] | None = None,
 ) -> List[Dict]:
     """
-    Reciprocal Rank Fusion.
+    Reciprocal Rank Fusion with optional weights.
     lists: e.g. [bm25_results, vec_results]
     score_keys: score key to read from each list element (e.g. ["bm25","score_vec"]);
     if None, use rank-based only.
+    weights: optional weights for each list (e.g. [0.4, 0.6] for BM25/Vector)
     """
     score_keys = score_keys or [None] * len(lists)
+    weights = weights or [1.0] * len(lists)  # default equal weights
+
     agg: Dict[str, Dict] = {}
-    for L, sk in zip(lists, score_keys):
+    for L, sk, weight in zip(lists, score_keys, weights):
         for rank, item in enumerate(L, start=1):
             uid = item["chunk_uid"]
             base = agg.get(uid, {"item": item, "rrf": 0.0})
-            # basic RRF(rank) + optionally original score weighted (slightly)
-            rrf = 1.0 / (k + rank)
+            # basic RRF(rank) weighted by list weight
+            rrf = weight * (1.0 / (k + rank))
             if sk and item.get(sk) is not None:
                 # assume 0~1 score and fine addition (weight is empirical value)
-                rrf += 0.05 * float(item[sk])
+                rrf += 0.05 * weight * float(item[sk])
             base["rrf"] += rrf
             agg[uid] = base
     out = []
