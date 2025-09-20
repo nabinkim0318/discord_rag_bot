@@ -1,9 +1,12 @@
 # rag_agent/query/query_planner.py
 """
-Query decomposition and intent detection system
-Analyze user queries and decompose them into intent-based sub-queries
-and generate appropriate filters.
+Query decomposition and intent detection system (English-only)
+- Decomposes compound queries
+- Detects intent: schedule | faq | resources
+- Extracts light structure (week number, audience)
+- Emits lightweight filters to be consumed by retrieval layer
 """
+from __future__ import annotations
 
 import re
 from dataclasses import dataclass
@@ -12,18 +15,18 @@ from typing import Any, Dict, List, Optional
 
 @dataclass
 class QueryIntent:
-    """Query intent information"""
+    """Intent for a (sub-)query."""
 
-    intent: str  # schedule, faq, resources
-    query: str  # original or refined query
+    intent: str  # 'schedule' | 'faq' | 'resources'
+    query: str  # original or refined sub-query
     confidence: float  # 0.0 ~ 1.0
-    filters: Dict[str, Any]  # Weaviate filter conditions
-    extracted_info: Dict[str, Any]  # 추출된 정보 (week, topic 등)
+    filters: Dict[str, Any]  # normalized filters (week, doc_type, audience)
+    extracted_info: Dict[str, Any]  # e.g., {"week": 3, "audience": "engineer"}
 
 
 @dataclass
 class QueryPlan:
-    """Query plan"""
+    """Plan produced for a user query."""
 
     original_query: str
     intents: List[QueryIntent]
@@ -32,233 +35,231 @@ class QueryPlan:
 
 
 class QueryPlanner:
-    """Query plan generator"""
+    """English-only query planner with simple keyword/pattern scoring."""
 
     def __init__(self):
-        # Intent-based keyword mapping
-        self.intent_keywords = {
+        # NOTE: keyword lists are de-duplicated at init-time
+        self.intent_keywords: Dict[str, Dict[str, Any]] = {
             "schedule": {
-                "keywords": [
-                    "week",
-                    "week",
-                    "when",
-                    "schedule",
-                    "pitch",
-                    "demo",
-                    "matching",
-                    "deadline",
-                    "time",
-                    "date",
+                "keywords": list(
+                    {
+                        "week",
+                        "when",
+                        "schedule",
+                        "pitch",
+                        "demo",
+                        "matching",
+                        "deadline",
+                        "time",
+                        "date",
+                    }
+                ),
+                # capture "week 3", "wk3", "w#3", "3rd week"
+                "patterns": [
+                    r"\bweek\s*#?\s*(\d{1,2})\b",
+                    r"\b(?:wk|w)\s*#?\s*(\d{1,2})\b",
+                    r"\b(\d{1,2})(?:st|nd|rd|th)?\s*week\b",
                 ],
-                "patterns": [r"week\s*(\d+)", r"week\s*(\d+)", r"(\d+)\s*week"],
             },
             "faq": {
-                "keywords": [
-                    "paid",
-                    "unpaid",
-                    "visa",
-                    "opt",
-                    "cpt",
-                    "regulation",
-                    "policy",
-                    "requirement",
-                    "commit",
-                    "time",
-                ],
+                "keywords": list(
+                    {
+                        "paid",
+                        "unpaid",
+                        "visa",
+                        "opt",
+                        "cpt",
+                        "regulation",
+                        "policy",
+                        "requirement",
+                        "commitment",
+                        "hours",
+                    }
+                ),
                 "patterns": [],
             },
             "resources": {
-                "keywords": [
-                    "link",
-                    "material",
-                    "playlist",
-                    "video",
-                    "training",
-                    "training",
-                    "course",
-                    "lecture",
-                    "form",
-                    "form",
-                ],
+                "keywords": list(
+                    {
+                        "link",
+                        "material",
+                        "playlist",
+                        "video",
+                        "training",
+                        "course",
+                        "lecture",
+                        "form",
+                        "docs",
+                        "document",
+                        "tutorial",
+                    }
+                ),
                 "patterns": [],
             },
         }
 
-        # Split separator
-        self.split_patterns = [
-            r"\s+그리고\s+",
-            r"\s+랑\s+",
-            r"\s+및\s+",
-            r"\s+,\s+",
-            r"\s+;\s+",
+        # Conservative splitters for compound queries.
+        # We split on commas/semicolons and " and " only if surrounded by spaces.
+        self.split_patterns: List[str] = [
+            r"\s*,\s*",
+            r"\s*;\s*",
+            r"\s+\band\b\s+",
+            r"\s+\&\s+",
+            r"\s+\bplus\b\s+",
         ]
 
+        # Scoring config
+        self.keyword_weight = 0.3
+        self.pattern_weight = 0.5
+        self.min_intent_threshold = 0.35  # if below, treat as "no clear intent"
+
+    # -------- public --------
+
     def plan_query(self, user_query: str) -> QueryPlan:
-        """
-        Analyze user query and plan
-
-        Args:
-            user_query: user query
-
-        Returns:
-            QueryPlan: query plan
-        """
-        original_query = user_query.strip()
-
-        # 1. Query decomposition (compound query processing)
+        original_query = (user_query or "").strip()
         sub_queries = self._split_query(original_query)
 
-        # 2. Intent analysis for each sub-query
-        intents = []
-        for sub_query in sub_queries:
-            intent = self._analyze_intent(sub_query)
-            if intent:
-                intents.append(intent)
+        intents: List[QueryIntent] = []
+        for sub in sub_queries:
+            qi = self._analyze_intent(sub)
+            if qi:
+                intents.append(qi)
 
-        # 3. Check if clarification is needed
-        requires_clarification, clarification_question = (
-            self._check_clarification_needed(original_query, intents)
-        )
+        requires, question = self._check_clarification_needed(original_query, intents)
 
         return QueryPlan(
             original_query=original_query,
             intents=intents,
-            requires_clarification=requires_clarification,
-            clarification_question=clarification_question,
+            requires_clarification=requires,
+            clarification_question=question,
         )
 
+    # -------- internals --------
+
     def _split_query(self, query: str) -> List[str]:
-        """Compound query to sub-queries"""
-        # 분할 구분자로 나누기
         parts = [query]
         for pattern in self.split_patterns:
-            new_parts = []
-            for part in parts:
-                new_parts.extend(re.split(pattern, part, flags=re.IGNORECASE))
-            parts = new_parts
+            next_parts: List[str] = []
+            for p in parts:
+                next_parts.extend(re.split(pattern, p, flags=re.IGNORECASE))
+            parts = next_parts
 
-        # Remove empty strings and refine
-        sub_queries = [q.strip() for q in parts if q.strip()]
-
-        # If not split, return original
+        sub_queries = [p.strip() for p in parts if p and p.strip()]
         return sub_queries if len(sub_queries) > 1 else [query]
 
     def _analyze_intent(self, query: str) -> Optional[QueryIntent]:
-        """Intent analysis for sub-query"""
-        query_lower = query.lower()
-        intent_scores = {}
+        ql = query.lower()
+        intent_scores: Dict[str, float] = {}
 
-        # Calculate score for each intent
-        for intent, config in self.intent_keywords.items():
+        for intent, cfg in self.intent_keywords.items():
             score = 0.0
 
-            # Keyword matching
-            keyword_matches = sum(1 for kw in config["keywords"] if kw in query_lower)
-            if keyword_matches > 0:
-                score += keyword_matches * 0.3
+            # Keyword hits (deduped)
+            kw_hits = sum(1 for kw in cfg["keywords"] if kw in ql)
+            if kw_hits:
+                score += kw_hits * self.keyword_weight
 
-            # Pattern matching
-            for pattern in config["patterns"]:
-                if re.search(pattern, query_lower):
-                    score += 0.4
+            # Regex pattern hits
+            for pat in cfg["patterns"]:
+                if re.search(pat, ql):
+                    score += self.pattern_weight
 
+            # Cap at 1.0
+            score = min(score, 1.0)
             intent_scores[intent] = score
 
-        # Select the intent with the highest score
-        if not intent_scores or max(intent_scores.values()) < 0.3:
+        if not intent_scores:
             return None
 
         best_intent = max(intent_scores, key=intent_scores.get)
-        confidence = min(intent_scores[best_intent], 1.0)
+        best_score = intent_scores[best_intent]
 
-        # Generate filters and extracted information
-        filters, extracted_info = self._generate_filters_and_info(best_intent, query)
+        if best_score < self.min_intent_threshold:
+            return None
+
+        filters, extracted = self._generate_filters_and_info(best_intent, query)
 
         return QueryIntent(
             intent=best_intent,
             query=query,
-            confidence=confidence,
+            confidence=best_score,
             filters=filters,
-            extracted_info=extracted_info,
+            extracted_info=extracted,
         )
 
     def _generate_filters_and_info(
         self, intent: str, query: str
     ) -> tuple[Dict[str, Any], Dict[str, Any]]:
-        """Generate filters and extracted information based on intent"""
-        filters = {}
-        extracted_info = {}
+        filters: Dict[str, Any] = {}
+        extracted: Dict[str, Any] = {}
 
         if intent == "schedule":
-            # Extract week information
             week = self._extract_week(query)
-            if week:
+            if week is not None:
                 filters["week"] = week
-                extracted_info["week"] = week
-
-            # Schedule related filters
+                extracted["week"] = week
             filters["doc_type"] = "schedule"
 
         elif intent == "faq":
-            # FAQ related filters
             filters["doc_type"] = "faq"
 
         elif intent == "resources":
-            # Resources related filters
             filters["doc_type"] = "resources"
+            aud = self._extract_audience(query)
+            if aud:
+                filters["audience"] = aud
+                extracted["audience"] = aud
 
-            # Extract audience (engineer, pm, designer, all)
-            audience = self._extract_audience(query)
-            if audience:
-                filters["audience"] = audience
-                extracted_info["audience"] = audience
-
-        return filters, extracted_info
+        return filters, extracted
 
     def _extract_week(self, query: str) -> Optional[int]:
-        """Extract week information from query"""
-        patterns = [r"week\s*(\d+)", r"주차\s*(\d+)", r"(\d+)\s*주차", r"(\d+)\s*week"]
-
-        for pattern in patterns:
-            match = re.search(pattern, query.lower())
-            if match:
+        """
+        English-focused week extraction:
+        - 'week 3', 'wk3', 'w#3', '3rd week'
+        """
+        ql = query.lower()
+        patterns = [
+            r"\bweek\s*#?\s*(\d{1,2})\b",
+            r"\b(?:wk|w)\s*#?\s*(\d{1,2})\b",
+            r"\b(\d{1,2})(?:st|nd|rd|th)?\s*week\b",
+        ]
+        for pat in patterns:
+            m = re.search(pat, ql)
+            if m:
                 try:
-                    return int(match.group(1))
+                    val = int(m.group(1))
+                    if 1 <= val <= 20:  # sane guardrail
+                        return val
                 except ValueError:
                     continue
-
         return None
 
     def _extract_audience(self, query: str) -> Optional[str]:
-        """Extract audience information from query"""
-        query_lower = query.lower()
-
-        if any(
-            kw in query_lower
-            for kw in ["engineer", "engineer", "development", "coding"]
-        ):
+        ql = query.lower()
+        if any(k in ql for k in ["engineer", "developer", "dev", "coding"]):
             return "engineer"
-        elif any(kw in query_lower for kw in ["pm", "product", "product", "planning"]):
+        if any(k in ql for k in ["pm", "product manager", "product", "planning"]):
             return "pm"
-        elif any(kw in query_lower for kw in ["designer", "design", "ui", "ux"]):
+        if any(k in ql for k in ["designer", "design", "ui", "ux"]):
             return "designer"
-
         return "all"
 
     def _check_clarification_needed(
         self, original_query: str, intents: List[QueryIntent]
     ) -> tuple[bool, Optional[str]]:
-        """Check if clarification is needed"""
-        # Week information is needed but not provided
+        # If there is a schedule intent but no week extracted, ask once.
         schedule_intents = [i for i in intents if i.intent == "schedule"]
         if schedule_intents and not any(
             i.extracted_info.get("week") for i in schedule_intents
         ):
-            return True, "Which week are you referring to? (e.g. Week 4)"
+            return True, "Which week are you referring to? (e.g., Week 3)"
 
-        # Too many intents
+        # If too many intents, ask to narrow.
         if len(intents) > 3:
-            return True, "The question is too complex. Please ask one at a time?"
+            return (
+                True,
+                "Your question spans multiple topics. Could you ask one at a time?",
+            )
 
         return False, None
 

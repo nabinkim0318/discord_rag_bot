@@ -36,7 +36,7 @@ def test_module_files_exist():
         "evaluation/__init__.py",
         "ingestion/pipeline.py",
         "retrieval/pipeline.py",
-        "generation/pipeline.py",
+        "generation/generation_pipeline.py",
     ]
 
     for module_path in required_modules:

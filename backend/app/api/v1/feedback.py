@@ -30,6 +30,9 @@ async def submit_feedback(
         except Exception:
             pass
 
+        if not user_id:
+            raise HTTPException(status_code=400, detail="X-User-ID header required")
+
         logger.info(
             "Received feedback: {} for query: {}",
             feedback.feedback_type,
@@ -44,6 +47,7 @@ async def submit_feedback(
         # Save feedback to database
         feedback_record = Feedback(
             query_id=feedback.query_id,
+            user_id=user_id,
             feedback=feedback.feedback_type,
             comment=feedback.comment,
         )
@@ -72,6 +76,8 @@ async def submit_feedback(
             "feedback_id": feedback_record.id,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to save feedback: {str(e)}")
         session.rollback()

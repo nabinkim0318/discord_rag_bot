@@ -16,10 +16,17 @@ Token count is recommended to use tiktoken (fallback if not installed).
 from __future__ import annotations
 
 import re
+import sys
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from app.core.config import settings
 from app.core.logging import logger
+
+# add path to backend directory
+backend_dir = Path(__file__).parent.parent.parent / "backend"
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
 
 try:
     import tiktoken
@@ -78,7 +85,7 @@ def pack_contexts(
     seen = set()
     total_tokens = 0
     for h in sorted_hits:
-        text = h.get("text", "")
+        text = h.get("text") or h.get("content", "")
         key = _dedup_key(text[:500])
         if key in seen:
             continue

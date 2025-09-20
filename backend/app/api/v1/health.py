@@ -106,7 +106,11 @@ async def health_check_vector_store():
     try:
         # Check Weaviate health (with fallback)
         try:
-            from app.core.weaviate_client import weaviate_client
+            from app.core.weaviate_client import get_weaviate_client
+
+            weaviate_client = get_weaviate_client()
+            if weaviate_client is None:
+                raise Exception("Weaviate client not available")
 
             is_healthy = weaviate_client.health_check()
 
