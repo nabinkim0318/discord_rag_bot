@@ -1,10 +1,16 @@
-# rag_agent/retrieval/pipeline.py
+# rag_agent/retrieval/retrieval_pipeline.py
 from __future__ import annotations
 
 import logging
 import time
 from typing import Any, Dict, List, Optional
 
+from backend.app.core.metrics import (
+    record_failure_metric,
+    record_rag_pipeline_latency,
+    record_retrieval_hit,
+    record_retriever_topk,
+)
 from rag_agent.retrieval.fuse import mmr_select, rrf_combine
 from rag_agent.retrieval.keyword import bm25_search
 from rag_agent.retrieval.vector import vector_search
@@ -15,7 +21,7 @@ log = logging.getLogger(__name__)
 def _sqlite_where_from_filters(filters: Optional[Dict[str, Any]]) -> Optional[str]:
     """
     very simple where builder (extend if needed).
-    예: {"source": "Training.pdf"} → "source = 'Training.pdf'"
+    e.g. {"source": "Training.pdf"} → "source = 'Training.pdf'"
     """
     if not filters:
         return None
@@ -62,6 +68,9 @@ def search_hybrid(
     weaviate_filters: Optional[Dict[str, Any]] = None,
     embed_model: Optional[str] = None,
     mmr_lambda: float = 0.6,
+    # metrics/options
+    record_latency: bool = True,
+    metrics_endpoint: str = "/api/v1/rag/retrieval",
 ) -> List[Dict]:
     """
     1) BM25 k, Vector k search
@@ -71,10 +80,24 @@ def search_hybrid(
     """
     t0 = time.time()
     where = _sqlite_where_from_filters(sqlite_filters)
-    bm = bm25_search(db_path, query, k=k_bm25, where=where)
-    ve = vector_search(
-        query, k=k_vec, filters=weaviate_filters, embed_model=embed_model
-    )
+
+    # ── BM25
+    try:
+        bm = bm25_search(db_path, query, k=k_bm25, where=where)
+    except Exception as e:
+        record_failure_metric(metrics_endpoint, "bm25_search_error")
+        log.exception("bm25_search failed, %s", e)
+        bm = []
+
+    # ── Vector
+    try:
+        ve = vector_search(
+            query, k=k_vec, filters=weaviate_filters, embed_model=embed_model
+        )
+    except Exception as e:
+        record_failure_metric(metrics_endpoint, "vector_search_error")
+        log.exception("vector_search failed, %s", e)
+        ve = []
 
     # log: top 3 of each
     def _peek(name, arr, key):
@@ -84,17 +107,30 @@ def search_hybrid(
     _peek("bm25", bm, "score_bm25")
     _peek("vec", ve, "score_vec")
 
+    # ── RRF + MMR
     fused = rrf_combine([bm, ve], score_keys=["score_bm25", "score_vec"])
     mmr = mmr_select(fused, lambda_=mmr_lambda, topn=top_k_final, text_key="content")
 
+    # ── record metrics
     took = time.time() - t0
+    try:
+        record_retriever_topk(top_k_final)
+        record_retrieval_hit(bool(mmr))  # whether at least one context was retrieved
+        if record_latency:
+            # if there is no separate retrieval-specific histogram, record in
+            # pipeline latency (label separated by endpoint)
+            record_rag_pipeline_latency(took)
+    except Exception as e:
+        log.exception("metric failure, %s", e)
+        # ignore metric failure as it does not affect functionality
+        pass
+
     log.info(
-        "[retrieval] hybrid len(bm,vec,fused,final)=(%d,%d,%d,%d) p95~? took=%.3fs",
+        "[retrieval] hybrid len(bm,vec,fused,final)=(%d,%d,%d,%d) took=%.3fs",
         len(bm),
         len(ve),
         len(fused),
         len(mmr),
         took,
     )
-
     return _llm_ready(mmr)

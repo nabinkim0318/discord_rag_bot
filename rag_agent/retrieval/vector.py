@@ -4,8 +4,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-from app.core.config import settings
-
+from backend.app.core.config import settings
+from backend.app.core.metrics import record_failure_metric
 from rag_agent.indexing.embeddings import embed_texts
 
 log = logging.getLogger(__name__)
@@ -89,5 +89,14 @@ def vector_search(
                 }
             )
         return out
+    except Exception as e:
+        # record once at this level (can keep only upper level if desired)
+        try:
+            record_failure_metric("/api/v1/rag/retrieval", "weaviate_query_error")
+        except Exception as e:
+            log.exception("metric failure, %s", e)
+            pass
+        log.exception("weaviate vector query failed, %s", e)
+        return []
     finally:
         c.close()
