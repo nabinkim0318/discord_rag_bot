@@ -25,7 +25,7 @@ except Exception:
 
 # Reuse backend settings (WEAVIATE_URL, WEAVIATE_API_KEY)
 try:
-    from backend.app.core.config import settings
+    from app.core.config import settings
 except Exception:
 
     class _S:  # For standalone execution
@@ -38,13 +38,7 @@ CLASS_NAME = "KBChunk"  # Match the class name created in C-step
 
 
 # ---------- Utils ----------
-def _min_max_norm(vals: List[float]) -> List[float]:
-    if not vals:
-        return vals
-    lo, hi = min(vals), max(vals)
-    if hi - lo < 1e-12:  # All the same
-        return [0.5 for _ in vals]
-    return [(v - lo) / (hi - lo) for v in vals]
+# _min_max_norm function removed - using original scores for consistency with RRF
 
 
 def _weaviate_client():
@@ -68,7 +62,7 @@ def vector_search_weaviate_by_query_vec(
     """
     Search KBChunk by nearVector (vectorizer: none)
     Return: [{chunk_uid, content, source, doc_id, chunk_id,
-    page, metadata, vec_score}, ...]
+    page, metadata, score_vec}, ...]
     """
     c = _weaviate_client()
     try:
@@ -104,11 +98,14 @@ def vector_search_weaviate_by_query_vec(
             except Exception:
                 md = {}
 
-            # distance → similarity (cosine distance assumed)
-            dist = it["_additional"].get("distance")
-            # Weaviate cosine distance range: [0, 2] (0=identical, 2=opposite)
-            # sim ~= 1 - dist/2 mapping
-            sim = 1.0 - float(dist or 1.0) / 2.0
+            # distance → similarity (standardized with vector.py)
+            add = it["_additional"] or {}
+            # Use certainty if available (0~1), otherwise 1 - distance
+            if "certainty" in add and add["certainty"] is not None:
+                sim = float(add["certainty"])
+            else:
+                dist = float(add.get("distance", 1.0))
+                sim = max(0.0, 1.0 - dist)
 
             out.append(
                 {
@@ -119,7 +116,7 @@ def vector_search_weaviate_by_query_vec(
                     "chunk_id": it.get("chunk_id"),
                     "page": it.get("page"),
                     "metadata": md,
-                    "vec_score": sim,
+                    "score_vec": sim,  # Standardized key name
                 }
             )
         return out
@@ -174,7 +171,7 @@ def hybrid_retrieve_v2(
         record_latency=False,  # disable metrics for evaluation
     )
 
-    # Convert to legacy format (score -> combined, add bm25/vec_score)
+    # Convert to legacy format (score -> combined, add bm25/score_vec)
     converted = []
     for item in results:
         converted_item = {
@@ -186,7 +183,7 @@ def hybrid_retrieve_v2(
             "page": item.get("page"),
             "combined": item["score"],  # RRF+MMR final score
             "bm25": 0.0,  # RRF is hard to separate individual scores
-            "vec_score": 0.0,  # RRF is hard to separate individual scores
+            "score_vec": 0.0,  # RRF is hard to separate individual scores
         }
         converted.append(converted_item)
 
@@ -218,7 +215,7 @@ def hybrid_retrieve(
         (actual weights are automatically calculated in RRF)
 
     Return: [{chunk_uid, content, source, doc_id,
-    chunk_id, page, combined, bm25, vec_score}, ...]
+    chunk_id, page, combined, bm25, score_vec}, ...]
     """
     # use new pipeline (call adapter function)
     return hybrid_retrieve_v2(
@@ -257,24 +254,15 @@ def hybrid_retrieve_legacy(
     3) Normalize + weighted sum for base score
     4) MMR for final k_final reranking
     Return: [{chunk_uid, content, source, doc_id,
-    chunk_id, page, score, bm25, vec_score}, ...]
+    chunk_id, page, score, bm25, score_vec}, ...]
     """
     # --- 1) BM25 ---
     bm25_hits = bm25_search(sqlite_path, query, k=k_bm25, where=where_fts)
-    # BM25 score is "smaller is better" so we need to invert it.
-    # sqlite fts5's bm25() value is smaller means higher relevance →
-    # convert to similarity-like larger is better
-    if bm25_hits:
-        raw = [h["bm25"] for h in bm25_hits]
-        # Invert/normalize: smaller value=larger score
-        # First min-max normalize then invert 1-x is straightforward
-        mm = _min_max_norm(raw)  # smaller value=0, larger value=1
-        bm25_norm = [1.0 - v for v in mm]  # smaller bm25 → larger score
-    else:
-        bm25_norm = []
+    # Use original BM25 scores (smaller is better) - consistent with RRF approach
+    # RRF is rank-based so score direction doesn't matter much
 
-    bm25_map = {}  # chunk_uid → (payload, norm_score)
-    for h, s in zip(bm25_hits, bm25_norm):
+    bm25_map = {}  # chunk_uid → (payload, score)
+    for h in bm25_hits:
         bm25_map[h["chunk_uid"]] = (
             {
                 "chunk_uid": h["chunk_uid"],
@@ -284,7 +272,7 @@ def hybrid_retrieve_legacy(
                 "chunk_id": h.get("chunk_id"),
                 "page": h.get("page"),
             },
-            s,
+            float(h.get("bm25", 0.0)),  # Use original BM25 score
         )
 
     # --- 2) Vector top-k ---
@@ -293,11 +281,8 @@ def hybrid_retrieve_legacy(
         query_vec, top_k=k_vec, where_filter=weaviate_where
     )
 
-    # vec_score itself is mapped to [0..1] so additional normalization
-    # is optional (norm again for scale stability)
-    vec_raw = [h["vec_score"] for h in vec_hits]
-    vec_norm = _min_max_norm(vec_raw) if vec_raw else []
-    vec_map = {h["chunk_uid"]: (h, s) for h, s in zip(vec_hits, vec_norm)}
+    # Use original score_vec values (0..1) - consistent with RRF approach
+    vec_map = {h["chunk_uid"]: (h, h["score_vec"]) for h in vec_hits}
 
     # --- 3) Merge candidates + base score (weighted sum) ---
     # Merge by same chunk_uid
@@ -325,7 +310,7 @@ def hybrid_retrieve_legacy(
         payload.update(
             {
                 "bm25": b_s,
-                "vec_score": v_s,
+                "score_vec": v_s,  # Standardized key name
                 "combined": combined,
             }
         )

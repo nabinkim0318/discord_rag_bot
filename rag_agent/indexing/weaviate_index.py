@@ -29,7 +29,7 @@ try:
 except Exception:
     weaviate = None
 
-from backend.app.core.config import settings  # Reuse backend settings
+from app.core.config import settings  # Reuse backend settings
 
 CLASS_NAME = "KBChunk"  # Recommended class name (separate from RAGDocument)
 NAMESPACE = uuid.NAMESPACE_URL

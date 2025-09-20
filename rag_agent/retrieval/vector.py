@@ -4,8 +4,9 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-from backend.app.core.config import settings
-from backend.app.core.metrics import record_failure_metric
+from app.core.config import settings
+from app.core.metrics import record_failure_metric
+
 from rag_agent.indexing.embeddings import embed_texts
 
 log = logging.getLogger(__name__)
