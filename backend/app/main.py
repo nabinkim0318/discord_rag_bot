@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel
 
 from app.api import query
-from app.api.v1 import feedback, health, rag
+from app.api.v1 import enhanced_rag, feedback, health, rag
 from app.core.config import settings
 from app.core.error_handlers import setup_error_handlers
 from app.core.logging import log_api_request, logger
@@ -50,6 +50,7 @@ app.add_middleware(
 
 # Register routers
 app.include_router(rag.router)
+app.include_router(enhanced_rag.router)
 app.include_router(feedback.router)
 app.include_router(query.router, prefix="/api/query")
 app.include_router(health.router, prefix="/api/v1/health", tags=["Health"])

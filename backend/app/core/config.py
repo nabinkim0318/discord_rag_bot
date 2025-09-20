@@ -33,8 +33,21 @@ class Settings:
 
     # ==================== External API Settings ====================
     OPENAI_API_KEY: Optional[str] = None
-    OPENAI_MODEL: str = "gpt-4"
-    OPENAI_MAX_TOKENS: int = 1000
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_BASE_URL: Optional[str] = None
+
+    # ==================== Token budgets ====================
+    GENERATION_MAX_TOKENS: int = 512
+    PROMPT_TOKEN_BUDGET: int = 6000
+
+    # ==================== Cohere/Jina reranker ====================
+    COHERE_API_KEY: Optional[str] = None
+    JINA_API_KEY: Optional[str] = None
+
+    # ==================== Azure OpenAI ====================
+    AZURE_OPENAI_API_KEY: Optional[str] = None
+    AZURE_OPENAI_ENDPOINT: Optional[str] = None
+    AZURE_OPENAI_DEPLOYMENT: Optional[str] = None
 
     # ==================== Weaviate Settings ====================
     WEAVIATE_URL: str = "http://weaviate:8080"
