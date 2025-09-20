@@ -32,12 +32,12 @@ lint: lint-backend lint-rag lint-frontend
 
 lint-backend:
 	cd backend && poetry run black --check .
-	cd backend && poetry run isort --check .
+	cd backend && poetry run isort --check --profile black .
 	cd backend && poetry run flake8 .
 
 lint-rag:
 	cd rag_agent && poetry run black --check .
-	cd rag_agent && poetry run isort --check .
+	cd rag_agent && poetry run isort --check --profile black .
 	cd rag_agent && poetry run flake8 .
 
 lint-frontend:
@@ -46,11 +46,11 @@ lint-frontend:
 format: format-backend format-rag format-frontend format-all
 
 format-backend:
-	cd backend && poetry run isort .
+	cd backend && poetry run isort --profile black .
 	cd backend && poetry run black .
 
 format-rag:
-	cd rag_agent && poetry run isort .
+	cd rag_agent && poetry run isort --profile black .
 	cd rag_agent && poetry run black .
 
 format-frontend:
