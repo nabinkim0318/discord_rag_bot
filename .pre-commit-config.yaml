@@ -28,7 +28,8 @@ repos:
       - id: trailing-whitespace
 
   # Markdown Lint (document organizer - optional)
-  - repo: https://github.com/markdownlint/markdownlint
-    rev: v0.12.0
-    hooks:
-      - id: markdownlint
+  # Disabled due to Ruby version compatibility issues
+  # - repo: https://github.com/markdownlint/markdownlint
+  #   rev: v0.12.0
+  #   hooks:
+  #     - id: markdownlint
