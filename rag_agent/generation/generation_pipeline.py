@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
+from dotenv import load_dotenv
 from rag_agent.generation.context_packer import pack_contexts, render_context_block
 from rag_agent.generation.llm_client import llm_generate
 from rag_agent.generation.prompting import build_rag_prompt
@@ -12,6 +13,12 @@ from rag_agent.retrieval.reranker import maybe_rerank
 from rag_agent.search.hybrid_search import hybrid_retrieve
 
 from app.core.config import settings
+
+# Load environment variables from root .env file
+root_dir = Path(__file__).parent.parent.parent.parent
+env_path = root_dir / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
 
 # backend 디렉토리를 Python 경로에 추가
 backend_dir = Path(__file__).parent.parent.parent / "backend"
@@ -59,7 +66,7 @@ def generate_answer(
         hits,
         prompt_header_tokens=600,
         max_budget=settings.PROMPT_TOKEN_BUDGET,
-        model_hint=settings.OPENAI_MODEL,
+        model_hint=settings.LLM_MODEL,
     )
     context_block = render_context_block(chosen)
 
@@ -90,7 +97,7 @@ def generate_answer(
             "version": prompt_version,
             "length": len(prompt),
         },
-        "model": settings.OPENAI_MODEL,
+        "model": settings.LLM_MODEL,
     }
 
     return output, chosen, meta

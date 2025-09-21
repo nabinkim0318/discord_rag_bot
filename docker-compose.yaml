@@ -7,6 +7,8 @@ services:
     container_name: weaviate
     ports:
       - "8080:8080"
+    env_file:
+      - ./.env
     environment:
       QUERY_DEFAULTS_LIMIT: "25"
       AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
@@ -32,7 +34,7 @@ services:
       dockerfile: Dockerfile
     container_name: discord-rag-api
     env_file:
-      - ./backend/.env
+      - ./.env
     volumes:
       - ./backend:/app
       - ./rag_agent:/app/rag_agent
@@ -74,7 +76,7 @@ services:
       dockerfile: Dockerfile
     container_name: discord-rag-bot
     env_file:
-      - ./bots/.env
+      - ./.env
     volumes:
       - ./bots:/app
     depends_on:
@@ -97,8 +99,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_BACKEND_API_URL=http://api:8001/api/v1
-    command: npm run dev
+      - NEXT_PUBLIC_BACKEND_API_URL=http://localhost:8001/api/v1
+    command: npm run dev -- -H 0.0.0.0
     depends_on:
       api:
         condition: service_healthy

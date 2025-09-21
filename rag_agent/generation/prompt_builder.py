@@ -8,8 +8,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
+from dotenv import load_dotenv
+
 from app.core.logging import logger
 from app.core.metrics import record_prompt_version
+
+# Load environment variables from root .env file
+root_dir = Path(__file__).parent.parent.parent.parent
+env_path = root_dir / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
 
 # backend 디렉토리를 Python 경로에 추가
 backend_dir = Path(__file__).parent.parent.parent / "backend"

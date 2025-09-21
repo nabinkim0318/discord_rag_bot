@@ -78,7 +78,7 @@ async def health_check_llm():
 
         # client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         # response = await client.chat.completions.create(
-        #     model=settings.OPENAI_MODEL,
+        #     model=settings.LLM_MODEL,
         #     messages=[{"role": "user", "content": "Hi"}],
         #     max_tokens=1,
         #     timeout=10.0,
@@ -90,7 +90,7 @@ async def health_check_llm():
         return {
             "status": "llm healthy",
             "duration": duration,
-            "model": settings.OPENAI_MODEL,
+            "model": settings.LLM_MODEL,
             "response_time": duration,
         }
     except Exception as e:

@@ -5,9 +5,17 @@ import sys
 from pathlib import Path
 from typing import Generator, Optional
 
+from dotenv import load_dotenv
+
 from app.core.config import settings
 from app.core.logging import logger
 from app.core.retry import retry_openai
+
+# Load environment variables from root .env file
+root_dir = Path(__file__).parent.parent.parent.parent
+env_path = root_dir / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
 
 # backend 디렉토리를 Python 경로에 추가
 backend_dir = Path(__file__).parent.parent.parent / "backend"
@@ -31,13 +39,13 @@ def _make_client():
             api_key=settings.AZURE_OPENAI_API_KEY,
             api_version="2024-02-15-preview",
             azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
-        ), ("azure", settings.AZURE_OPENAI_DEPLOYMENT or settings.OPENAI_MODEL)
+        ), ("azure", settings.AZURE_OPENAI_DEPLOYMENT or settings.LLM_MODEL)
 
     if OpenAI and settings.OPENAI_API_KEY:
-        base_url = settings.OPENAI_BASE_URL or None  # DeepSeek 등 호환 엔드포인트
+        base_url = settings.LLM_API_BASE_URL or None  # DeepSeek 등 호환 엔드포인트
         return OpenAI(api_key=settings.OPENAI_API_KEY, base_url=base_url), (
             "openai",
-            settings.OPENAI_MODEL,
+            settings.LLM_MODEL,
         )
 
     raise RuntimeError(

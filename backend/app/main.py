@@ -1,7 +1,9 @@
 # app/main.py
+from pathlib import Path
 from time import time
 from uuid import uuid4
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel
@@ -17,6 +19,12 @@ from app.models import (  # noqa: F401 ensure table registration
     feedback as _feedback_model,
 )
 from app.models import query as _query_model  # noqa: F401 ensure table registration
+
+# Load environment variables from root .env file
+root_dir = Path(__file__).parent.parent.parent
+env_path = root_dir / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
 
 # Logging
 logger.info("App starting...")
