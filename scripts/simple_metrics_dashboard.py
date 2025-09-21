@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-간단한 Metrics 대시보드 (Docker 없이)
+Simple Metrics Dashboard (without Docker)
 """
 from datetime import datetime
 
@@ -8,7 +8,7 @@ import requests
 
 
 def get_metrics():
-    """백엔드에서 metrics 가져오기"""
+    """Get metrics from the backend"""
     try:
         response = requests.get("http://localhost:8001/metrics")
         if response.status_code == 200:
@@ -20,7 +20,7 @@ def get_metrics():
 
 
 def parse_metrics(metrics_text):
-    """Metrics 텍스트 파싱"""
+    """Parse metrics text"""
     metrics = {}
     lines = metrics_text.split("\n")
 
@@ -42,7 +42,7 @@ def parse_metrics(metrics_text):
 
 
 def display_dashboard():
-    """간단한 대시보드 표시"""
+    """Display simple dashboard"""
     print("=" * 60)
     print("📊 RAG Bot Metrics Dashboard")
     print("=" * 60)
@@ -51,16 +51,16 @@ def display_dashboard():
 
     metrics_text = get_metrics()
     if not metrics_text:
-        print("❌ 백엔드 API에 연결할 수 없습니다.")
+        print("❌ Cannot connect to the backend API.")
         print(
-            "   백엔드를 시작하세요: cd backend && poetry run uvicorn app.main:app \
+            "   Start the backend: cd backend && poetry run uvicorn app.main:app \
             --host 0.0.0.0 --port 8001 --reload"
         )
         return
 
     metrics = parse_metrics(metrics_text)
 
-    # RAG 관련 metrics
+    # RAG related metrics
     print("🤖 RAG Metrics:")
     rag_metrics = {k: v for k, v in metrics.items() if "rag_" in k}
     if rag_metrics:
@@ -72,7 +72,7 @@ def display_dashboard():
             else:
                 print(f"  📊 {name}: {value}")
     else:
-        print("  📊 아직 RAG 쿼리가 없습니다.")
+        print("  📊 No RAG queries yet.")
 
     print()
 
@@ -87,7 +87,7 @@ def display_dashboard():
             else:
                 print(f"  📊 {name}: {int(value)}")
     else:
-        print("  📊 Health metrics 없음")
+        print("  📊 No health metrics")
 
     print()
 
@@ -104,9 +104,9 @@ def display_dashboard():
     print()
     print("=" * 60)
     print("💡 Tips:")
-    print("  - RAG 쿼리를 실행하면 metrics가 업데이트됩니다")
-    print("  - Docker를 설치하면 Grafana 대시보드를 사용할 수 있습니다")
-    print("  - http://localhost:8001/metrics 에서 원시 데이터 확인 가능")
+    print("  - RAG queries update metrics")
+    print("  - Docker to use Grafana dashboard")
+    print("  - http://localhost:8001/metrics to see raw data")
 
 
 if __name__ == "__main__":
