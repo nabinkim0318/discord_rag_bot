@@ -33,8 +33,8 @@ class Settings:
 
     # ==================== External API Settings ====================
     OPENAI_API_KEY: Optional[str] = None
-    OPENAI_MODEL: str = "gpt-4o-mini"
-    OPENAI_BASE_URL: Optional[str] = None
+    LLM_MODEL: str = "gpt-4o-mini"
+    LLM_API_BASE_URL: Optional[str] = None
 
     # ==================== Token budgets ====================
     GENERATION_MAX_TOKENS: int = 512
@@ -63,7 +63,13 @@ class Settings:
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     # ==================== CORS Settings ====================
-    CORS_ORIGINS: List[str] = ["*"]
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:3000",  # Frontend
+        "http://localhost:3001",  # Grafana
+        "http://localhost:3002",  # Grafana (alternative)
+        "http://localhost:8001",  # Backend API
+        "http://localhost:9090",  # Prometheus
+    ]
     CORS_ALLOW_CREDENTIALS: bool = True
 
     # ==================== Rate Limiting ====================
