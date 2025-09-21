@@ -22,7 +22,11 @@ services:
       - app_net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/meta"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O - http://localhost:8080/v1/meta >/dev/null 2>&1 || exit 1",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -36,25 +40,41 @@ services:
     env_file:
       - ./.env
     volumes:
-      - ./backend:/app
+      - ./backend:/app # 전역 설치라 안전
       - ./rag_agent:/app/rag_agent
     ports:
       - "8001:8001"
-    command: poetry run uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001
     depends_on:
-      weaviate:
-        condition: service_healthy
-      rag_agent:
-        condition: service_started
+      weaviate: { condition: service_started }
+      rag_agent: { condition: service_started }
     networks:
       - app_net
       - monitoring
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test:
+        - CMD-SHELL
+        - |
+          python - <<'PY'
+          import socket, sys, time
+
+          ok = 0
+          for _ in range(10):
+              try:
+                  s = socket.create_connection(('127.0.0.1', 8001), timeout=2)
+                  s.close()
+                  ok = 1
+                  break
+              except Exception:
+                  time.sleep(3)
+
+          sys.exit(0 if ok else 1)
+          PY
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 60s
 
   # ==================== RAG Agent ====================
   rag_agent:
@@ -80,8 +100,7 @@ services:
     volumes:
       - ./bots:/app
     depends_on:
-      api:
-        condition: service_healthy
+      api: { condition: service_started }
     networks:
       - app_net
     restart: unless-stopped
@@ -102,8 +121,7 @@ services:
       - NEXT_PUBLIC_BACKEND_API_URL=http://localhost:8001/api/v1
     command: npm run dev -- -H 0.0.0.0
     depends_on:
-      api:
-        condition: service_healthy
+      api: { condition: service_started }
     networks:
       - app_net
     restart: unless-stopped

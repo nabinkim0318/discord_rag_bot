@@ -22,6 +22,11 @@ from app.db.session import get_session
 router = APIRouter()
 
 
+@router.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 @router.get("/", tags=["Health"])
 async def health_check():
     start = perf_counter()

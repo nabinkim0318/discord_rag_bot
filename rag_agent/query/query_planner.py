@@ -379,8 +379,8 @@ class QueryPlanner:
                 self._make_intent("resources", clause, 0.95, weeks=weeks, audience=aud)
             ]
         if re.match(
-            rf"^\s*(?:please\s+)?(?:can you\s+|could you\s+)?\s* \
-            {RESOURCE_VERB_PREFIX}\s+(?:me\s+)?(?:the\s+)?{RESOURCE_WORDS}\b",
+            r"^\s*(?:please\s+)?(?:can you\s+|could you\s+)?\s*",
+            rf"{RESOURCE_VERB_PREFIX}\s+(?:me\s+)?(?:the\s+)?{RESOURCE_WORDS}\b",
             ql,
         ):
             weeks = self._extract_weeks(ql)
