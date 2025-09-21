@@ -15,7 +15,7 @@ scrape_configs:
   # FastAPI backend metric collection
   - job_name: "fastapi-backend"
     static_configs:
-      - targets: ["backend:8001"] # access container name within Docker network
+      - targets: ["api:8001"] # access container name within Docker network
     metrics_path: "/metrics"
     scrape_interval: 10s
     scrape_timeout: 5s
