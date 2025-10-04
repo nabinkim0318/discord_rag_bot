@@ -176,7 +176,7 @@ def main():
 
     results = []
     for test_name, test_func in tests:
-        logger.info(f"\n{'='*50}")
+        logger.info(f"\n{'=' * 50}")
         try:
             result = test_func()
             results.append((test_name, result))
@@ -185,9 +185,9 @@ def main():
             results.append((test_name, False))
 
     # Results summary
-    logger.info(f"\n{'='*50}")
+    logger.info(f"\n{'=' * 50}")
     logger.info("📊 Test results summary")
-    logger.info(f"{'='*50}")
+    logger.info(f"{'=' * 50}")
 
     passed = 0
     for test_name, result in results:
@@ -197,7 +197,7 @@ def main():
             passed += 1
 
     logger.info(f"\nTotal {len(results)} tests, {passed} passed")
-    logger.info(f"Success rate: {passed/len(results)*100:.1f}%")
+    logger.info(f"Success rate: {passed / len(results) * 100:.1f}%")
 
     return passed == len(results)
 

@@ -13,6 +13,7 @@ Remaining budget sequentially filled
 
 Token count is recommended to use tiktoken (fallback if not installed).
 """
+
 from __future__ import annotations
 
 import re
@@ -164,5 +165,5 @@ def render_context_block(chosen: List[Dict[str, Any]]) -> str:
         # Safe access to page field - check both direct and metadata
         pg = h.get("page") or (h.get("metadata") or {}).get("page", "")
         uid = h.get("chunk_uid", "")
-        lines.append(f"[{i}] (src: {src}, page: " f"{pg}, uid: {uid})\n{h['text']}\n")
+        lines.append(f"[{i}] (src: {src}, page: {pg}, uid: {uid})\n{h['text']}\n")
     return "\n".join(lines)

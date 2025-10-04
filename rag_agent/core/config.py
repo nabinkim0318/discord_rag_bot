@@ -2,6 +2,7 @@
 """
 Configuration settings for rag_agent to use backend settings
 """
+
 from typing import Optional
 
 from pydantic import BaseSettings

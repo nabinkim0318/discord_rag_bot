@@ -56,32 +56,30 @@ db-init-alembic:
 lint: lint-backend lint-rag lint-frontend
 
 lint-backend:
-	cd backend && poetry run black --check .
 	cd backend && poetry run isort --check --profile black .
-	cd backend && poetry run flake8 .
+	cd backend && poetry run ruff check --line-length 88 .
 
 lint-rag:
-	cd rag_agent && poetry run black --check .
 	cd rag_agent && poetry run isort --check --profile black .
-	cd rag_agent && poetry run flake8 .
+	cd rag_agent && poetry run ruff check --line-length 88 .
 
 lint-frontend:
 	cd frontend && npm run format:check
 
 format: format-backend format-rag format-frontend format-all
 
-# 🎯 최적의 포맷팅 도구 조합 (자동화) - 빠른 버전
+# 🎯 최적의 포맷팅 도구 조합 (자동화) - Ruff 전용
 format-backend:
 	@echo "🎨 포맷팅 Backend 코드..."
 	cd backend && poetry run isort --profile black --line-length 88 .
-	cd backend && poetry run black --line-length 88 .
 	cd backend && poetry run ruff check --fix --line-length 88 .
+	cd backend && poetry run ruff format .
 
 format-rag:
 	@echo "🎨 포맷팅 RAG Agent 코드..."
 	cd rag_agent && poetry run isort --profile black --line-length 88 .
-	cd rag_agent && poetry run black --line-length 88 .
 	cd rag_agent && poetry run ruff check --fix --line-length 88 .
+	cd rag_agent && poetry run ruff format .
 
 # 🎯 고급 포맷팅 (yapf 포함) - 느릴 수 있음
 format-backend-advanced:
@@ -114,16 +112,14 @@ format-check: format-check-backend format-check-rag format-check-frontend
 format-check-backend:
 	@echo "🔍 Backend 포맷팅 검사..."
 	cd backend && poetry run isort --check-only --profile black --line-length 88 .
-	cd backend && poetry run black --check --line-length 88 .
 	cd backend && poetry run ruff check --line-length 88 .
-	cd backend && poetry run flake8 --max-line-length=88 --extend-ignore=E203,W503 .
+	cd backend && poetry run ruff format --check .
 
 format-check-rag:
 	@echo "🔍 RAG Agent 포맷팅 검사..."
 	cd rag_agent && poetry run isort --check-only --profile black --line-length 88 .
-	cd rag_agent && poetry run black --check --line-length 88 .
 	cd rag_agent && poetry run ruff check --line-length 88 .
-	cd rag_agent && poetry run flake8 --max-line-length=88 --extend-ignore=E203,W503 .
+	cd rag_agent && poetry run ruff format --check .
 
 format-check-frontend:
 	@echo "🔍 Frontend 포맷팅 검사..."
