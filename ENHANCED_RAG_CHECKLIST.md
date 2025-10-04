@@ -83,12 +83,12 @@ cd bots && python run_bot.py
 # Basic RAG API
 curl -X POST "http://localhost:8001/api/v1/rag/" \
   -H "Content-Type: application/json" \
-  -d '{"query": "Week 4 Pitch Day 언제야?", "top_k": 5}'
+  -d '{"query": "When is Week 4 Pitch Day?", "top_k": 5}'
 
 # Enhanced RAG API
 curl -X POST "http://localhost:8001/api/v1/enhanced-rag/" \
   -H "Content-Type: application/json" \
-  -d '{"query": "Week 4 Pitch Day 정확한 일정이랑 팀 매칭 폼 링크도 줘", "top_k": 5}'
+  -d '{"query": "What is the exact schedule for Week 4 Pitch Day and can you provide the team matching form link?", "top_k": 5}'
 ```
 
 ### 3. Evaluation Execution
@@ -112,10 +112,10 @@ python -m rag_agent.evaluation.cli_eval \
 
 ```bash
 # Use slash commands in Discord
-/ask Week 4 Pitch Day 언제야?
-/ask 팀 매칭 양식 링크 줘
-/ask 인턴십 유급인가요?
-/ask 엔지니어 훈련 자료 어디서 찾을 수 있어?
+/ask When is Week 4 Pitch Day?
+/ask Can you provide the team matching form link?
+/ask Is the internship paid?
+/ask Where can I find engineering training materials?
 
 # Check system status
 /health
@@ -164,24 +164,24 @@ docker logs weaviate
 # Simple question
 curl -X POST "http://localhost:8001/api/v1/enhanced-rag/" \
   -H "Content-Type: application/json" \
-  -d '{"query": "Week 4 Pitch Day 언제야?"}'
+  -d '{"query": "When is Week 4 Pitch Day?"}'
 
 # Complex question
 curl -X POST "http://localhost:8001/api/v1/enhanced-rag/" \
   -H "Content-Type: application/json" \
-  -d '{"query": "Week 4 Pitch Day 정확한 일정이랑 팀 매칭 폼 링크도 줘"}'
+  -d '{"query": "What is the exact schedule for Week 4 Pitch Day and can you provide the team matching form link?"}'
 ```
 
-### 2. process/policy FAQ
+### 2. Process/Policy FAQ
 
 ```bash
 curl -X POST "http://localhost:8001/api/v1/enhanced-rag/" \
   -H "Content-Type: application/json" \
-  -d '{"query": "OPT/CPT 날짜 안 맞으면 어떻게 해야 해?"}'
+  -d '{"query": "What should I do if OPT/CPT dates don\'t match?"}'
 
 curl -X POST "http://localhost:8001/api/v1/enhanced-rag/" \
   -H "Content-Type: application/json" \
-  -d '{"query": "인턴십 유급인가요?"}'
+  -d '{"query": "Is the internship paid?"}'
 ```
 
 ### 3. Learning Resources/Training Links
@@ -189,11 +189,11 @@ curl -X POST "http://localhost:8001/api/v1/enhanced-rag/" \
 ```bash
 curl -X POST "http://localhost:8001/api/v1/enhanced-rag/" \
   -H "Content-Type: application/json" \
-  -d '{"query": "엔지니어 훈련 자료 어디서 찾을 수 있어?"}'
+  -d '{"query": "Where can I find engineering training materials?"}'
 
 curl -X POST "http://localhost:8001/api/v1/enhanced-rag/" \
   -H "Content-Type: application/json" \
-  -d '{"query": "프롬프트 엔지니어링 코스 링크"}'
+  -d '{"query": "Prompt engineering course link"}'
 ```
 
 ## 🔍 Debugging and Troubleshooting
@@ -209,80 +209,80 @@ docker-compose logs -f api
 docker-compose logs -f bot
 docker-compose logs -f weaviate
 
-# 데이터베이스 연결 확인
+# Database connection check
 curl http://localhost:8001/api/v1/health/db
 curl http://localhost:8001/api/v1/health/vector-store
 ```
 
-### 2. 성능 최적화
+### 2. Performance Optimization
 
 ```bash
-# 메트릭 확인
+# Check metrics
 curl http://localhost:8001/metrics | grep "rag_enhanced_pipeline_latency"
 
-# 평가 결과 확인
+# Check evaluation results
 cat rag_agent/evaluation_results/evaluation_metrics.json
 ```
 
-### 3. 설정 확인
+### 3. Configuration Check
 
 ```bash
-# 환경 변수 확인
+# Check environment variables
 cat backend/.env
 cat bots/.env
 
-# 설정 검증
+# Verify configuration
 curl http://localhost:8001/api/v1/health/
 ```
 
-## 📈 성능 지표 및 목표
+## 📈 Performance Metrics and Goals
 
-### 1. 검색 성능
+### 1. Search Performance
 
-- **Hit Rate**: > 80% (상위 5개 내 관련 문서 포함)
-- **nDCG**: > 0.7 (정규화된 할인 누적 이득)
-- **응답 시간**: < 2초 (p95)
+- **Hit Rate**: > 80% (relevant documents included in top 5)
+- **nDCG**: > 0.7 (normalized discounted cumulative gain)
+- **Response Time**: < 2 seconds (p95)
 
-### 2. 응답 품질
+### 2. Response Quality
 
-- **정확성**: > 90% (사실적 정확성)
-- **완전성**: > 85% (질문에 대한 완전한 답변)
-- **유용성**: > 80% (사용자 만족도)
+- **Accuracy**: > 90% (factual accuracy)
+- **Completeness**: > 85% (complete answers to questions)
+- **Usefulness**: > 80% (user satisfaction)
 
-### 3. 시스템 안정성
+### 3. System Stability
 
-- **가용성**: > 99.5%
-- **에러율**: < 1%
-- **처리량**: > 100 QPS
+- **Availability**: > 99.5%
+- **Error Rate**: < 1%
+- **Throughput**: > 100 QPS
 
-## 🚀 다음 단계 (선택사항)
+## 🚀 Next Steps (Optional)
 
-### 1. 고급 기능
+### 1. Advanced Features
 
-- [ ] Cross-Encoder 재랭킹 (bge-reranker-large)
-- [ ] 실시간 문서 업데이트
-- [ ] 사용자 피드백 학습
-- [ ] A/B 테스트 프레임워크
+- [ ] Cross-Encoder re-ranking (bge-reranker-large)
+- [ ] Real-time document updates
+- [ ] User feedback learning
+- [ ] A/B testing framework
 
-### 2. 확장성
+### 2. Scalability
 
-- [ ] 다중 언어 지원
-- [ ] 음성 질의 처리
-- [ ] 이미지/문서 업로드
-- [ ] 개인화된 응답
+- [ ] Multi-language support
+- [ ] Voice query processing
+- [ ] Image/document upload
+- [ ] Personalized responses
 
-### 3. 운영 최적화
+### 3. Operational Optimization
 
-- [ ] 자동 스케일링
-- [ ] 캐싱 전략
-- [ ] 백업 및 복구
-- [ ] 보안 강화
+- [ ] Auto-scaling
+- [ ] Caching strategy
+- [ ] Backup and recovery
+- [ ] Security enhancement
 
 ---
 
-문제가 발생하거나 추가 기능이 필요한 경우:
+If issues occur or additional features are needed:
 
-1. 로그 확인: `docker-compose logs -f [service]`
-2. 메트릭 확인: `curl http://localhost:8001/metrics`
-3. 헬스 체크: `curl http://localhost:8001/api/v1/health/`
-4. 평가 실행: `python -m rag_agent.evaluation.cli_eval --gold rag_agent/data/enhanced_gold_eval.json`
+1. Check logs: `docker-compose logs -f [service]`
+2. Check metrics: `curl http://localhost:8001/metrics`
+3. Health check: `curl http://localhost:8001/api/v1/health/`
+4. Run evaluation: `python -m rag_agent.evaluation.cli_eval --gold rag_agent/data/enhanced_gold_eval.json`

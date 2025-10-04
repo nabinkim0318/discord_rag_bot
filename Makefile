@@ -68,61 +68,61 @@ lint-frontend:
 
 format: format-backend format-rag format-frontend format-all
 
-# 🎯 최적의 포맷팅 도구 조합 (자동화) - Ruff 전용
+# 🎯 Optimal formatting tool combination (automated) - Ruff only
 format-backend:
-	@echo "🎨 포맷팅 Backend 코드..."
+	@echo "🎨 Formatting Backend code..."
 	cd backend && poetry run isort --profile black --line-length 88 .
 	cd backend && poetry run ruff check --fix --line-length 88 .
 	cd backend && poetry run ruff format .
 
 format-rag:
-	@echo "🎨 포맷팅 RAG Agent 코드..."
+	@echo "🎨 Formatting RAG Agent code..."
 	cd rag_agent && poetry run isort --profile black --line-length 88 .
 	cd rag_agent && poetry run ruff check --fix --line-length 88 .
 	cd rag_agent && poetry run ruff format .
 
-# 🎯 고급 포맷팅 (yapf 포함) - 느릴 수 있음
+# 🎯 Advanced formatting (including yapf) - may be slow
 format-backend-advanced:
-	@echo "🎨 고급 포맷팅 Backend 코드..."
+	@echo "🎨 Advanced formatting Backend code..."
 	cd backend && poetry run isort --profile black --line-length 88 .
 	cd backend && poetry run black --line-length 88 .
 	cd backend && poetry run yapf --in-place --recursive --style='{based_on_style: pep8, column_limit: 88}' .
 	cd backend && poetry run ruff check --fix --line-length 88 .
 
 format-rag-advanced:
-	@echo "🎨 고급 포맷팅 RAG Agent 코드..."
+	@echo "🎨 Advanced formatting RAG Agent code..."
 	cd rag_agent && poetry run isort --profile black --line-length 88 .
 	cd rag_agent && poetry run black --line-length 88 .
 	cd rag_agent && poetry run yapf --in-place --recursive --style='{based_on_style: pep8, column_limit: 88}' .
 	cd rag_agent && poetry run ruff check --fix --line-length 88 .
 
 format-frontend:
-	@echo "🎨 포맷팅 Frontend 코드..."
+	@echo "🎨 Formatting Frontend code..."
 	cd frontend && npm run format
 
 format-all:
-	@echo "🎨 전체 프로젝트 포맷팅..."
+	@echo "🎨 Formatting entire project..."
 	npx prettier --write .
 	$(MAKE) format-backend
 	$(MAKE) format-rag
 
-# 🔍 포맷팅 검사 (CI/CD용)
+# 🔍 Formatting check (for CI/CD)
 format-check: format-check-backend format-check-rag format-check-frontend
 
 format-check-backend:
-	@echo "🔍 Backend 포맷팅 검사..."
+	@echo "🔍 Backend formatting check..."
 	cd backend && poetry run isort --check-only --profile black --line-length 88 .
 	cd backend && poetry run ruff check --line-length 88 .
 	cd backend && poetry run ruff format --check .
 
 format-check-rag:
-	@echo "🔍 RAG Agent 포맷팅 검사..."
+	@echo "🔍 RAG Agent formatting check..."
 	cd rag_agent && poetry run isort --check-only --profile black --line-length 88 .
 	cd rag_agent && poetry run ruff check --line-length 88 .
 	cd rag_agent && poetry run ruff format --check .
 
 format-check-frontend:
-	@echo "🔍 Frontend 포맷팅 검사..."
+	@echo "🔍 Frontend formatting check..."
 	cd frontend && npm run format:check
 
 test: test-backend test-rag test-frontend
