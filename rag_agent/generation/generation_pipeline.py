@@ -1,29 +1,19 @@
 # rag_agent/generation/generation_pipeline.py
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
-from dotenv import load_dotenv
+from app.core.config import settings
+
+from rag_agent.core._bootstrap import attach_backend_path
 from rag_agent.generation.context_packer import pack_contexts, render_context_block
 from rag_agent.generation.llm_client import llm_generate
 from rag_agent.generation.prompting import build_rag_prompt
 from rag_agent.retrieval.reranker import maybe_rerank
 from rag_agent.search.hybrid_search import hybrid_retrieve
 
-from app.core.config import settings
-
-# Load environment variables from root .env file
-root_dir = Path(__file__).parent.parent.parent.parent
-env_path = root_dir / ".env"
-if env_path.exists():
-    load_dotenv(env_path)
-
-# Add backend directory to Python path
-backend_dir = Path(__file__).parent.parent.parent / "backend"
-if str(backend_dir) not in sys.path:
-    sys.path.insert(0, str(backend_dir))
+# Attach backend path and import settings
+attach_backend_path()
 
 
 def generate_answer(
@@ -44,7 +34,15 @@ def generate_answer(
     """
     return: (answer or stream, used_contexts(hits), metadata)
     """
-    sqlite_path = getattr(settings, "DATABASE_URL", "rag_kb.sqlite3")
+    # Parse SQLite path from DATABASE_URL or use dedicated setting
+    sqlite_path = getattr(settings, "RAG_SQLITE_PATH", None)
+    if not sqlite_path:
+        db_url = getattr(settings, "DATABASE_URL", "rag_kb.sqlite3")
+        if db_url.startswith("sqlite:///"):
+            # Extract file path from SQLite URL
+            sqlite_path = db_url.replace("sqlite:///", "")
+        else:
+            sqlite_path = db_url
     # 1) search
     hits = hybrid_retrieve(
         query,

@@ -1,28 +1,15 @@
 # rag_agent/generation/llm_client.py
 from __future__ import annotations
 
-import logging
 import os
-import sys
 import time
-from pathlib import Path
 from typing import Generator, Optional, Tuple
 
-from dotenv import load_dotenv
+from rag_agent.core._bootstrap import attach_backend_path, get_fallback_logger
 
-# add project root to Python path
-project_root = Path(__file__).parent.parent
-print(project_root)
-sys.path.insert(0, str(project_root))
-
-# load environment variables from project root
-print(project_root / ".env")
-load_dotenv(project_root / ".env")
-
-logger = logging.getLogger(__name__)
-
-ROOT = Path(__file__).resolve().parents[3]  # repo root
-load_dotenv(ROOT / ".env")  # ✅ root .env only
+# Attach backend path
+attach_backend_path()
+logger = get_fallback_logger(__name__)
 
 
 # Try OpenAI SDK 1.x
@@ -89,9 +76,11 @@ def _make_client() -> Tuple[object, Tuple[str, str]]:
         )
         return cli, ("azure", dep)
     if OpenAI and os.getenv("OPENAI_API_KEY"):
+        # Support both LLM_API_BASE_URL and OPENAI_BASE_URL (priority: LLM_API_BASE_URL)
+        base_url = os.getenv("LLM_API_BASE_URL") or os.getenv("OPENAI_BASE_URL")
         cli = OpenAI(
             api_key=os.getenv("OPENAI_API_KEY"),
-            base_url=os.getenv("OPENAI_BASE_URL") or None,
+            base_url=base_url,
         )
         mdl = os.getenv("LLM_MODEL", "gpt-4o-mini")
         return cli, ("openai", mdl)
