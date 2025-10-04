@@ -3,26 +3,16 @@
 # → ✅ example: build_prompt(context, query) → str
 
 import random
-import sys
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, List
-
-from dotenv import load_dotenv
 
 from app.core.logging import logger
 from app.core.metrics import record_prompt_version
 
-# Load environment variables from root .env file
-root_dir = Path(__file__).parent.parent.parent.parent
-env_path = root_dir / ".env"
-if env_path.exists():
-    load_dotenv(env_path)
+from rag_agent.core._bootstrap import attach_backend_path
 
-# Add backend directory to Python path
-backend_dir = Path(__file__).parent.parent.parent / "backend"
-if str(backend_dir) not in sys.path:
-    sys.path.insert(0, str(backend_dir))
+# Attach backend path
+attach_backend_path()
 
 
 class PromptBuilder:

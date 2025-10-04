@@ -16,27 +16,16 @@ Token count is recommended to use tiktoken (fallback if not installed).
 from __future__ import annotations
 
 import re
-import sys
 from collections import defaultdict
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-
-from dotenv import load_dotenv
 
 from app.core.config import settings
 from app.core.logging import logger
 
-# Load environment variables from root .env file
-root_dir = Path(__file__).parent.parent.parent.parent
-env_path = root_dir / ".env"
-if env_path.exists():
-    load_dotenv(env_path)
+from rag_agent.core._bootstrap import attach_backend_path
 
-
-# add path to backend directory
-backend_dir = Path(__file__).parent.parent.parent / "backend"
-if str(backend_dir) not in sys.path:
-    sys.path.insert(0, str(backend_dir))
+# Attach backend path
+attach_backend_path()
 
 try:
     import tiktoken
@@ -85,9 +74,9 @@ def pack_contexts(
     min_tail_budget: int = 256,  # ✅ answer margin tokens
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     budget = max_budget or settings.PROMPT_TOKEN_BUDGET
-    # header + answer margin tokens
-    remain = max(min_tail_budget, budget - prompt_header_tokens - min_tail_budget)
-    remain = max(128, remain)
+    # Simplified budget calculation: reserve header + tail once
+    reserved_tokens = prompt_header_tokens + min_tail_budget
+    remain = max(128, budget - reserved_tokens)
 
     # sort by score (rerank_score > score)
     def _score(h):
@@ -149,11 +138,19 @@ def _rough_token_count(text: str) -> int:
 def count_tokens(text: str, model_hint: str = "gpt-4o-mini") -> int:
     if tiktoken is None:
         return _rough_token_count(text)
-    try:
-        enc = tiktoken.get_encoding("o200k_base")  # gpt-4o series
-        return len(enc.encode(text))
-    except Exception:
-        return _rough_token_count(text)
+
+    # Try encoding fallback chain: o200k_base -> cl100k_base -> rough
+    encodings_to_try = ["o200k_base", "cl100k_base"]
+
+    for encoding_name in encodings_to_try:
+        try:
+            enc = tiktoken.get_encoding(encoding_name)
+            return len(enc.encode(text))
+        except Exception:
+            continue
+
+    # Fallback to rough estimation
+    return _rough_token_count(text)
 
 
 def render_context_block(chosen: List[Dict[str, Any]]) -> str:
@@ -163,7 +160,8 @@ def render_context_block(chosen: List[Dict[str, Any]]) -> str:
     lines = []
     for i, h in enumerate(chosen, 1):
         src = h.get("source", "")
-        pg = h.get("page", "")
+        # Safe access to page field - check both direct and metadata
+        pg = h.get("page") or (h.get("metadata") or {}).get("page", "")
         uid = h.get("chunk_uid", "")
         lines.append(f"[{i}] (src: {src}, page: " f"{pg}, uid: {uid})\n{h['text']}\n")
     return "\n".join(lines)
