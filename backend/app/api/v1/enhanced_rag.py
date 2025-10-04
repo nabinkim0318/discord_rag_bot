@@ -14,10 +14,10 @@ from app.services.enhanced_rag_service import run_enhanced_rag_pipeline
 
 # ==================== FastAPI Router ====================
 
-router = APIRouter(prefix="/api/v1/enhanced-rag", tags=["Enhanced RAG"])
+enhanced_rag_router = APIRouter(prefix="/api/v1/enhanced-rag", tags=["Enhanced RAG"])
 
 
-@router.post("/", response_model=RAGQueryResponse)
+@enhanced_rag_router.post("/", response_model=RAGQueryResponse)
 async def enhanced_query_rag(request: RAGQueryRequest, http_request: Request):
     """
     Enhanced RAG query processing
@@ -52,7 +52,7 @@ async def enhanced_query_rag(request: RAGQueryRequest, http_request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/health")
+@enhanced_rag_router.get("/health")
 async def enhanced_rag_health():
     """Enhanced RAG service health check"""
     try:

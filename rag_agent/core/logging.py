@@ -2,23 +2,17 @@
 """
 Configuration for using backend logging in rag_agent
 """
-import sys
-from pathlib import Path
+from ._bootstrap import attach_backend_path, get_fallback_logger
 
-# Add backend directory to Python path
-backend_dir = Path(__file__).parent.parent.parent / "backend"
-if str(backend_dir) not in sys.path:
-    sys.path.insert(0, str(backend_dir))
+# Attach backend path
+attach_backend_path()
 
-# Import logging from backend
+# Try to import backend logger first
 try:
-    from app.core.logging import logger
-except ImportError as e:
-    # Use basic logging if backend is not available
-    import logging
-
-    logger = logging.getLogger("rag_agent")
-    print(f"Warning: Using basic logging for rag_agent: {e}")
+    from app.core.logging import logger  # loguru logger
+except Exception as e:
+    logger = get_fallback_logger("rag_agent")
+    logger.warning("Using basic logging for rag_agent: %s", e)
 
 # Export logger
 __all__ = ["logger"]

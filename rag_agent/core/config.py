@@ -2,40 +2,48 @@
 """
 Configuration settings for rag_agent to use backend settings
 """
-import sys
-from pathlib import Path
+from typing import Optional
 
-# add backend directory to Python path
-backend_dir = Path(__file__).parent.parent.parent / "backend"
-if str(backend_dir) not in sys.path:
-    sys.path.insert(0, str(backend_dir))
+from pydantic import BaseSettings
 
-# import backend settings
+from ._bootstrap import attach_backend_path, get_fallback_logger
+
+# Attach backend path
+attach_backend_path()
+logger = get_fallback_logger()
+
+
+class _AgentSettings(BaseSettings):
+    """Rag_agent local settings with pydantic validation"""
+
+    OPENAI_API_KEY: Optional[str] = None
+    LLM_MODEL: str = "gpt-3.5-turbo"
+    LLM_API_BASE_URL: Optional[str] = None
+    AZURE_OPENAI_API_KEY: Optional[str] = None
+    AZURE_OPENAI_ENDPOINT: Optional[str] = None
+    AZURE_OPENAI_DEPLOYMENT: Optional[str] = None
+    COHERE_API_KEY: Optional[str] = None
+    JINA_API_KEY: Optional[str] = None
+    PROMPT_TOKEN_BUDGET: int = 4000
+    GENERATION_MAX_TOKENS: int = 1000
+    WEAVIATE_URL: str = "http://localhost:8080"
+    WEAVIATE_API_KEY: Optional[str] = None
+    WEAVIATE_CLASS_NAME: str = "RAGDocument"
+
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
+
+
+# Try to import backend settings first
 try:
-    from app.core.config import settings
-except ImportError as e:
-    # if backend is not available, use default values
-    import os
+    from app.core.config import settings as _backend_settings
 
-    class MockSettings:
-        """Mock settings for rag_agent when backend is not available"""
-
-        OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-        LLM_MODEL = os.getenv("LLM_MODEL", "gpt-3.5-turbo")
-        LLM_API_BASE_URL = os.getenv("LLM_API_BASE_URL")
-        AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
-        AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
-        AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT")
-        COHERE_API_KEY = os.getenv("COHERE_API_KEY")
-        JINA_API_KEY = os.getenv("JINA_API_KEY")
-        PROMPT_TOKEN_BUDGET = int(os.getenv("PROMPT_TOKEN_BUDGET", "4000"))
-        GENERATION_MAX_TOKENS = int(os.getenv("GENERATION_MAX_TOKENS", "1000"))
-        WEAVIATE_URL = os.getenv("WEAVIATE_URL", "http://localhost:8080")
-        WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY")
-        WEAVIATE_CLASS_NAME = os.getenv("WEAVIATE_CLASS_NAME", "RAGDocument")
-
-    settings = MockSettings()
-    print(f"Warning: Using mock settings for rag_agent: {e}")
+    settings = _backend_settings
+    logger.info("Using backend settings for rag_agent")
+except Exception as e:
+    logger.warning("Using rag_agent local settings fallback: %s", e)
+    settings = _AgentSettings()  # env 기반 로드
 
 # export settings
 __all__ = ["settings"]

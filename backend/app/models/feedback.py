@@ -12,9 +12,7 @@ from sqlmodel import Field, SQLModel
 class FeedbackBase(SQLModel):
     """Base feedback model"""
 
-    message_id: UUID = Field(
-        foreign_key="user_messages.id", description="Reference to user message"
-    )
+    query_id: str = Field(foreign_key="queries.id", description="Reference to query")
     user_id: str = Field(description="Discord user ID")
     score: str = Field(description="Feedback score: 'up' or 'down'")
     comment: Optional[str] = Field(default=None, description="Optional user comment")

@@ -6,11 +6,11 @@ import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.core.config import settings
 from app.core.logging import logger
+from app.db.session import engine
 
 
 class FeedbackService:
@@ -18,16 +18,16 @@ class FeedbackService:
 
     def __init__(self):
         """Initialize feedback service with database connection"""
-        self.engine = create_engine(settings.DATABASE_URL)
+        self.engine = engine
 
     def submit_feedback(
-        self, message_id: str, user_id: str, score: str, comment: Optional[str] = None
+        self, query_id: str, user_id: str, score: str, comment: Optional[str] = None
     ) -> Tuple[bool, str]:
         """
         Submit user feedback for a RAG response
 
         Args:
-            message_id: UUID of the original message
+            query_id: UUID of the original query
             user_id: Discord user ID
             score: 'up' or 'down'
             comment: Optional comment from user
@@ -40,21 +40,21 @@ class FeedbackService:
             if score not in ["up", "down"]:
                 return False, "Score must be 'up' or 'down'"
 
-            # Check if message exists
-            if not self._message_exists(message_id):
-                return False, "Message not found"
+            # Check if query exists
+            if not self._query_exists(query_id):
+                return False, "Query not found"
 
-            # Check if feedback already exists for this message from this user
-            if self._feedback_exists(message_id, user_id):
-                return False, "Feedback already submitted for this message"
+            # Check if feedback already exists for this query from this user
+            if self._feedback_exists(query_id, user_id):
+                return False, "Feedback already submitted for this query"
 
             # Insert feedback
             feedback_id = str(uuid.uuid4())
             query = text(
                 """
-                INSERT INTO feedback (id, message_id, user_id,
+                INSERT INTO feedback (id, query_id, user_id,
                 score, comment, created_at)
-                VALUES (:id, :message_id, :user_id, :score,
+                VALUES (:id, :query_id, :user_id, :score,
                 :comment, :created_at)
             """
             )
@@ -64,7 +64,7 @@ class FeedbackService:
                     query,
                     {
                         "id": feedback_id,
-                        "message_id": message_id,
+                        "query_id": query_id,
                         "user_id": user_id,
                         "score": score,
                         "comment": comment,
@@ -73,7 +73,7 @@ class FeedbackService:
                 )
                 conn.commit()
 
-            logger.info(f"Feedback submitted: {feedback_id} for message {message_id}")
+            logger.info(f"Feedback submitted: {feedback_id} for query {query_id}")
             return True, "Feedback submitted successfully"
 
         except SQLAlchemyError as e:
@@ -83,12 +83,12 @@ class FeedbackService:
             logger.error(f"Unexpected error submitting feedback: {e}")
             return False, "Unexpected error occurred"
 
-    def get_feedback_stats(self, message_id: str) -> Dict[str, int]:
+    def get_feedback_stats(self, query_id: str) -> Dict[str, int]:
         """
-        Get feedback statistics for a message
+        Get feedback statistics for a query
 
         Args:
-            message_id: UUID of the message
+            query_id: UUID of the query
 
         Returns:
             Dictionary with up/down counts
@@ -98,13 +98,13 @@ class FeedbackService:
                 """
                 SELECT score, COUNT(*) as count
                 FROM feedback
-                WHERE message_id = :message_id
+                WHERE query_id = :query_id
                 GROUP BY score
             """
             )
 
             with self.engine.connect() as conn:
-                result = conn.execute(query, {"message_id": message_id}).fetchall()
+                result = conn.execute(query, {"query_id": query_id}).fetchall()
 
             stats = {"up": 0, "down": 0}
             for row in result:
@@ -133,10 +133,10 @@ class FeedbackService:
         try:
             query = text(
                 """
-                SELECT f.id, f.message_id, f.score, f.comment, f.created_at,
-                       um.question, um.response
+                SELECT f.id, f.query_id, f.score, f.comment, f.created_at,
+                       q.query AS question, q.answer AS response
                 FROM feedback f
-                JOIN user_messages um ON f.message_id = um.id
+                JOIN queries q ON f.query_id = q.id
                 WHERE f.user_id = :user_id
                 ORDER BY f.created_at DESC
                 LIMIT :limit
@@ -153,7 +153,7 @@ class FeedbackService:
                 feedback_list.append(
                     {
                         "id": str(row.id),
-                        "message_id": str(row.message_id),
+                        "query_id": str(row.query_id),
                         "score": row.score,
                         "comment": row.comment,
                         "created_at": row.created_at.isoformat(),
@@ -171,29 +171,29 @@ class FeedbackService:
             logger.error(f"Unexpected error getting user feedback: {e}")
             return []
 
-    def _message_exists(self, message_id: str) -> bool:
-        """Check if a message exists in the database"""
+    def _query_exists(self, query_id: str) -> bool:
+        """Check if a query exists in the database"""
         try:
-            query = text("SELECT 1 FROM user_messages WHERE id = :message_id")
+            query = text("SELECT 1 FROM queries WHERE id = :query_id")
             with self.engine.connect() as conn:
-                result = conn.execute(query, {"message_id": message_id}).fetchone()
+                result = conn.execute(query, {"query_id": query_id}).fetchone()
                 return result is not None
         except Exception as e:
-            logger.error(f"Error checking message existence: {e}")
+            logger.error(f"Error checking query existence: {e}")
             return False
 
-    def _feedback_exists(self, message_id: str, user_id: str) -> bool:
-        """Check if feedback already exists for this message from this user"""
+    def _feedback_exists(self, query_id: str, user_id: str) -> bool:
+        """Check if feedback already exists for this query from this user"""
         try:
             query = text(
                 """
                 SELECT 1 FROM feedback
-                WHERE message_id = :message_id AND user_id = :user_id
+                WHERE query_id = :query_id AND user_id = :user_id
             """
             )
             with self.engine.connect() as conn:
                 result = conn.execute(
-                    query, {"message_id": message_id, "user_id": user_id}
+                    query, {"query_id": query_id, "user_id": user_id}
                 ).fetchone()
                 return result is not None
         except Exception as e:

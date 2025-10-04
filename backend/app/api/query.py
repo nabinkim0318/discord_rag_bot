@@ -12,10 +12,10 @@ from app.models.query import Query
 from app.models.rag import RAGQueryRequest, RAGQueryResponse
 from app.services.rag_service import run_rag_pipeline
 
-router = APIRouter()
+query_router = APIRouter()
 
 
-@router.post("/", response_model=RAGQueryResponse)
+@query_router.post("/", response_model=RAGQueryResponse)
 async def query_rag(
     request: RAGQueryRequest,
     session: Session = Depends(get_session),
@@ -120,6 +120,6 @@ async def query_rag(
         )
 
 
-@router.get("/queries/", response_model=List[Query])
+@query_router.get("/queries/", response_model=List[Query])
 def get_queries(session: Session = Depends(get_session)):
     return session.exec(select(Query)).all()
