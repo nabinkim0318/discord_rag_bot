@@ -3,6 +3,7 @@
 Configuration settings for the RAG Backend API
 """
 
+import os
 from pathlib import Path
 from typing import List, Optional
 
@@ -32,31 +33,31 @@ class Settings:
     MAX_TOP_K: int = 20
 
     # ==================== External API Settings ====================
-    OPENAI_API_KEY: Optional[str] = None
-    LLM_MODEL: str = "gpt-4o-mini"
-    LLM_API_BASE_URL: Optional[str] = None
+    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
+    LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
+    LLM_API_BASE_URL: Optional[str] = os.getenv("LLM_API_BASE_URL")
 
     # ==================== Token budgets ====================
-    GENERATION_MAX_TOKENS: int = 512
-    PROMPT_TOKEN_BUDGET: int = 6000
+    GENERATION_MAX_TOKENS: int = int(os.getenv("GENERATION_MAX_TOKENS", "512"))
+    PROMPT_TOKEN_BUDGET: int = int(os.getenv("PROMPT_TOKEN_BUDGET", "6000"))
 
     # ==================== Cohere/Jina reranker ====================
-    COHERE_API_KEY: Optional[str] = None
-    JINA_API_KEY: Optional[str] = None
+    COHERE_API_KEY: Optional[str] = os.getenv("COHERE_API_KEY")
+    JINA_API_KEY: Optional[str] = os.getenv("JINA_API_KEY")
 
     # ==================== Azure OpenAI ====================
-    AZURE_OPENAI_API_KEY: Optional[str] = None
-    AZURE_OPENAI_ENDPOINT: Optional[str] = None
-    AZURE_OPENAI_DEPLOYMENT: Optional[str] = None
+    AZURE_OPENAI_API_KEY: Optional[str] = os.getenv("AZURE_OPENAI_API_KEY")
+    AZURE_OPENAI_ENDPOINT: Optional[str] = os.getenv("AZURE_OPENAI_ENDPOINT")
+    AZURE_OPENAI_DEPLOYMENT: Optional[str] = os.getenv("AZURE_OPENAI_DEPLOYMENT")
 
     # ==================== Weaviate Settings ====================
-    WEAVIATE_URL: str = "http://weaviate:8080"
-    WEAVIATE_API_KEY: Optional[str] = None
-    WEAVIATE_CLASS_NAME: str = "RAGDocument"
-    WEAVIATE_BATCH_SIZE: int = 100
+    WEAVIATE_URL: str = os.getenv("WEAVIATE_URL", "http://weaviate:8080")
+    WEAVIATE_API_KEY: Optional[str] = os.getenv("WEAVIATE_API_KEY")
+    WEAVIATE_CLASS_NAME: str = os.getenv("WEAVIATE_CLASS_NAME", "RAGDocument")
+    WEAVIATE_BATCH_SIZE: int = int(os.getenv("WEAVIATE_BATCH_SIZE", "100"))
 
     # ==================== Database Settings ====================
-    DATABASE_URL: Optional[str] = None
+    DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL")
 
     # ==================== Security Settings ====================
     SECRET_KEY: str = "your-secret-key-here"

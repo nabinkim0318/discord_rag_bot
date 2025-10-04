@@ -4,12 +4,15 @@
 import logging
 import os
 import re
+import sys
 import time
 import uuid
+from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 import httpx
 import interactions
+from dotenv import load_dotenv
 from httpx import Limits, Retry
 from interactions import (
     ActionRow,
@@ -25,6 +28,15 @@ from interactions import (
 )
 from interactions.api.http import Forbidden
 from metrics import RAG_FAILURES, RAG_LATENCY, RAG_TOTAL
+
+# add project root to Python path
+project_root = Path(__file__).parent.parent
+print(project_root)
+sys.path.insert(0, str(project_root))
+
+# load environment variables from project root
+print(project_root / ".env")
+load_dotenv(project_root / ".env")
 
 logger = logging.getLogger("discord_bot")
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))

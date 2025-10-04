@@ -50,12 +50,12 @@ class EnhancedRetriever:
     def __init__(
         self,
         db_path: str,
-        k_bm25: int = 25,
-        k_vec: int = 25,
+        k_bm25: int = 30,
+        k_vec: int = 30,
         k_final: int = 8,
         bm25_weight: float = 0.4,
         vec_weight: float = 0.6,
-        mmr_lambda: float = 0.6,
+        mmr_lambda: float = 0.65,
     ):
         self.db_path = db_path
         self.k_bm25 = k_bm25

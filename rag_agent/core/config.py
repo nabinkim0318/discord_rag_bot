@@ -1,20 +1,20 @@
 # rag_agent/core/config.py
 """
-Rag_agent에서 backend의 settings를 사용하기 위한 설정
+Configuration settings for rag_agent to use backend settings
 """
 import sys
 from pathlib import Path
 
-# backend 디렉토리를 Python 경로에 추가
+# add backend directory to Python path
 backend_dir = Path(__file__).parent.parent.parent / "backend"
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
-# backend의 settings를 import
+# import backend settings
 try:
     from app.core.config import settings
 except ImportError as e:
-    # backend가 없는 경우 기본값 사용
+    # if backend is not available, use default values
     import os
 
     class MockSettings:
@@ -37,5 +37,5 @@ except ImportError as e:
     settings = MockSettings()
     print(f"Warning: Using mock settings for rag_agent: {e}")
 
-# settings를 export
+# export settings
 __all__ = ["settings"]

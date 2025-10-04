@@ -5,16 +5,16 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
+from rag_agent.retrieval.fuse import mmr_select, rrf_combine
+from rag_agent.retrieval.keyword import bm25_search
+from rag_agent.retrieval.vector import vector_search
+
 from app.core.metrics import (
     record_failure_metric,
     record_rag_pipeline_latency,
     record_retrieval_hit,
     record_retriever_topk,
 )
-
-from rag_agent.retrieval.fuse import mmr_select, rrf_combine
-from rag_agent.retrieval.keyword import bm25_search
-from rag_agent.retrieval.vector import vector_search
 
 log = logging.getLogger(__name__)
 
@@ -62,16 +62,16 @@ def search_hybrid(
     query: str,
     *,
     db_path: str,
-    k_bm25: int = 25,
-    k_vec: int = 25,
-    top_k_final: int = 10,
+    k_bm25: int = 30,
+    k_vec: int = 30,
+    top_k_final: int = 8,
     sqlite_filters: Optional[Dict[str, Any]] = None,
     weaviate_filters: Optional[Dict[str, Any]] = None,
     embed_model: Optional[str] = None,
-    mmr_lambda: float = 0.6,
+    mmr_lambda: float = 0.65,
     # weights for RRF combination
-    bm25_weight: float = 1.0,
-    vec_weight: float = 1.0,
+    bm25_weight: float = 0.4,
+    vec_weight: float = 0.6,
     # metrics/options
     record_latency: bool = True,
     metrics_endpoint: str = "/api/v1/rag/retrieval",

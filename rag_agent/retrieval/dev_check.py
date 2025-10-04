@@ -10,14 +10,14 @@ from rag_agent.retrieval.vector import vector_search
 
 
 def compare_three(db_path: str, query: str) -> Dict[str, Any]:
-    bm = bm25_search(db_path, query, k=10)
-    ve = vector_search(query, k=10)
+    bm = bm25_search(db_path, query, k=8)
+    ve = vector_search(query, k=8)
     hy = search_hybrid(
         query,
         db_path=db_path,
-        k_bm25=25,
-        k_vec=25,
-        top_k_final=10,
+        k_bm25=30,
+        k_vec=30,
+        top_k_final=8,
         record_latency=False,
     )
 

@@ -11,7 +11,25 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from rag_agent.retrieval.enhanced_retrieval import EnhancedRetrievalResult
+try:
+    from rag_agent.retrieval.enhanced_retrieval import (
+        EnhancedRetrievalResult,  # type: ignore
+    )
+except Exception:
+    EnhancedRetrievalResult = object
+
+LINK_RE = re.compile(r"<([^>|]+)\|([^>]+)>|https?://\S+")
+
+
+def _extract_links(text: str) -> List[Dict[str, str]]:
+    out: List[Dict[str, str]] = []
+    for m in LINK_RE.finditer(text):
+        if m.group(2):  # <title|url>
+            out.append({"title": m.group(1), "url": m.group(2), "type": "link"})
+        else:
+            url = m.group(0)
+            out.append({"title": url, "url": url, "type": "link"})
+    return out
 
 
 @dataclass
@@ -222,25 +240,24 @@ Score: {result.score:.3f}
         self, response: str, retrieval_result: EnhancedRetrievalResult
     ) -> List[Dict[str, str]]:
         """Extract sources"""
-        sources = []
+        sources: List[Dict[str, str]] = []
 
-        # Extract links from response
-        link_pattern = r"<([^|]+)\|([^>]+)>"
-        links = re.findall(link_pattern, response)
-
-        for title, url in links:
-            sources.append({"title": title, "url": url, "type": "link"})
+        # new link extractor
+        sources.extend(_extract_links(response))
 
         # Add sources from search results
         seen_sources = set()
-        for result in retrieval_result.final_results:
-            source_key = (result.source, result.doc_id)
+        for result in getattr(retrieval_result, "final_results", []) or []:
+            source_key = (
+                getattr(result, "source", None),
+                getattr(result, "doc_id", None),
+            )
             if source_key not in seen_sources:
                 seen_sources.add(source_key)
                 sources.append(
                     {
-                        "title": result.source,
-                        "url": f"#{result.chunk_uid}",
+                        "title": getattr(result, "source", "document"),
+                        "url": f"#{getattr(result, 'chunk_uid', '')}",
                         "type": "document",
                     }
                 )

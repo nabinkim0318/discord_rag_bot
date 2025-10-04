@@ -29,8 +29,8 @@ if str(backend_dir) not in sys.path:
 def generate_answer(
     query: str,
     *,
-    k_bm25: int = 20,
-    k_vec: int = 20,
+    k_bm25: int = 30,
+    k_vec: int = 30,
     k_final: int = 8,
     bm25_weight: float = 0.4,
     vec_weight: float = 0.6,
@@ -44,10 +44,11 @@ def generate_answer(
     """
     return: (answer or stream, used_contexts(hits), metadata)
     """
+    sqlite_path = getattr(settings, "DATABASE_URL", "rag_kb.sqlite3")
     # 1) search
     hits = hybrid_retrieve(
         query,
-        sqlite_path="rag_kb.sqlite3",
+        sqlite_path=sqlite_path,
         k_bm25=k_bm25,
         k_vec=k_vec,
         k_final=k_final,
