@@ -1,8 +1,11 @@
+from rag_agent.core.logging import logger
 from rag_agent.query.query_planner import plan_query
 
-print(plan_query("What is the Week 3 schedule and the video resources for engineers?"))
-print()
-print(plan_query("resources for wk5 for PMs"))
+logger.info(
+    plan_query("What is the Week 3 schedule and the video resources for engineers?")
+)
+logger.info()
+logger.info(plan_query("resources for wk5 for PMs"))
 
 
 # print(plan_query("What is the Week 3 schedule and

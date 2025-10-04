@@ -6,19 +6,20 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+from rag_agent.core.logging import logger  # noqa: E402
 from rag_agent.ingestion.loader import load_many_pdfs  # noqa: E402
 
 
 def preview(records, n=3, preview_chars=500):
-    print(f"\nTotal pages extracted: {len(records)}")
+    logger.info(f"\nTotal pages extracted: {len(records)}")
     for i, r in enumerate(records[:n], 1):
         m = r.meta
-        print("=" * 80)
-        print(f"[{i}] {m.source}  |  title={m.title}  |  page={m.page}")
-        print(f"section={m.section_title}  |  checksum={m.checksum[:10]}...")
-        print("-" * 80)
-        print(r.text[:preview_chars].strip())
-        print()
+        logger.info("=" * 80)
+        logger.info(f"[{i}] {m.source}  |  title={m.title}  |  page={m.page}")
+        logger.info(f"section={m.section_title}  |  checksum={m.checksum[:10]}...")
+        logger.info("-" * 80)
+        logger.info(r.text[:preview_chars].strip())
+        logger.info()
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ Simple Metrics Dashboard (without Docker)
 from datetime import datetime
 
 import requests
+from rag_agent.core.logging import logger
 
 
 def get_metrics():
@@ -43,16 +44,16 @@ def parse_metrics(metrics_text):
 
 def display_dashboard():
     """Display simple dashboard"""
-    print("=" * 60)
-    print("📊 RAG Bot Metrics Dashboard")
-    print("=" * 60)
-    print(f"🕐 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print()
+    logger.info("=" * 60)
+    logger.info("📊 RAG Bot Metrics Dashboard")
+    logger.info("=" * 60)
+    logger.info(f"🕐 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info()
 
     metrics_text = get_metrics()
     if not metrics_text:
-        print("❌ Cannot connect to the backend API.")
-        print(
+        logger.warning("❌ Cannot connect to the backend API.")
+        logger.warning(
             "   Start the backend: cd backend && poetry run uvicorn app.main:app \
             --host 0.0.0.0 --port 8001 --reload"
         )
@@ -61,52 +62,52 @@ def display_dashboard():
     metrics = parse_metrics(metrics_text)
 
     # RAG related metrics
-    print("🤖 RAG Metrics:")
+    logger.info("🤖 RAG Metrics:")
     rag_metrics = {k: v for k, v in metrics.items() if "rag_" in k}
     if rag_metrics:
         for name, value in rag_metrics.items():
             if "count" in name or "total" in name:
-                print(f"  📈 {name}: {int(value)}")
+                logger.info(f"  📈 {name}: {int(value)}")
             elif "latency" in name or "seconds" in name:
-                print(f"  ⏱️  {name}: {value:.3f}s")
+                logger.info(f"  ⏱️  {name}: {value:.3f}s")
             else:
-                print(f"  📊 {name}: {value}")
+                logger.info(f"  📊 {name}: {value}")
     else:
-        print("  📊 No RAG queries yet.")
+        logger.info("  📊 No RAG queries yet.")
 
-    print()
+    logger.info()
 
     # Health metrics
-    print("🏥 Health Metrics:")
+    logger.info("🏥 Health Metrics:")
     health_metrics = {k: v for k, v in metrics.items() if "health_" in k}
     if health_metrics:
         for name, value in health_metrics.items():
             if "failures" in name:
                 status = "❌" if value > 0 else "✅"
-                print(f"  {status} {name}: {int(value)}")
+                logger.info(f"  {status} {name}: {int(value)}")
             else:
-                print(f"  📊 {name}: {int(value)}")
+                logger.info(f"  📊 {name}: {int(value)}")
     else:
-        print("  📊 No health metrics")
+        logger.info("  📊 No health metrics")
 
-    print()
+    logger.info()
 
     # Python metrics
-    print("🐍 Python Metrics:")
+    logger.info("🐍 Python Metrics:")
     python_metrics = {k: v for k, v in metrics.items() if "python_" in k}
     if python_metrics:
         for name, value in python_metrics.items():
             if "gc_" in name:
-                print(f"  🗑️  {name}: {int(value)}")
+                logger.info(f"  🗑️  {name}: {int(value)}")
             else:
-                print(f"  📊 {name}: {value}")
+                logger.info(f"  📊 {name}: {value}")
 
-    print()
-    print("=" * 60)
-    print("💡 Tips:")
-    print("  - RAG queries update metrics")
-    print("  - Docker to use Grafana dashboard")
-    print("  - http://localhost:8001/metrics to see raw data")
+    logger.info()
+    logger.info("=" * 60)
+    logger.info("💡 Tips:")
+    logger.info("  - RAG queries update metrics")
+    logger.info("  - Docker to use Grafana dashboard")
+    logger.info("  - http://localhost:8001/metrics to see raw data")
 
 
 if __name__ == "__main__":

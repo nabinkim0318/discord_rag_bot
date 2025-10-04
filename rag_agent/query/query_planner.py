@@ -64,7 +64,6 @@ DEMO_SYNONYMS = [
     r"\bfinal\s+(?:group|project|team)\s+demo\b",
 ]
 PITCH_SYNONYMS = [r"\bpitch day\b"]
-WEEK_TOK = re.compile(r"\b(week|wk|w#|w|this week|that week|wk\.)\b", re.I)
 
 # Week patterns: Week 3 / weeks 5–8 / wk 2 / 3rd week
 WEEK_RANGE_PAT = re.compile(
@@ -249,7 +248,7 @@ WEEKY_RESOURCE_HINT = re.compile(
 )
 
 
-# special terms → week augmentation
+# special terms -> week augmentation
 FORCED_WEEK = [
     (DEMO_SYNONYMS, 11),
     (PITCH_SYNONYMS, 4),
@@ -371,18 +370,29 @@ class QueryPlanner:
     def _analyze_clause(self, clause: str) -> List[QueryIntent]:
         ql = clause.lower().strip()
 
-        # Hard overrides → resources
+        # Check for submission keywords first (priority over resources)
+        has_submission_keyword = re.search(
+            r"\b(submission|submit|deliverable)\b", ql, re.I
+        )
+        if has_submission_keyword:
+            weeks = self._extract_weeks(ql)
+            aud = self._extract_audience(ql)
+            return [
+                self._make_intent("submission", clause, 0.9, weeks=weeks, audience=aud)
+            ]
+
+        # Hard overrides -> resources
         if re.match(rf"^\s*{RESOURCE_WORDS}\b", ql):
             weeks = self._extract_weeks(ql)
             aud = self._extract_audience(ql)
             return [
                 self._make_intent("resources", clause, 0.95, weeks=weeks, audience=aud)
             ]
-        if re.match(
-            r"^\s*(?:please\s+)?(?:can you\s+|could you\s+)?\s*",
-            rf"{RESOURCE_VERB_PREFIX}\s+(?:me\s+)?(?:the\s+)?{RESOURCE_WORDS}\b",
-            ql,
-        ):
+        pattern = (
+            rf"^\s*(?:please\s+)?(?:can you\s+|could you\s+)?\s*{RESOURCE_VERB_PREFIX}"
+            rf"\s+(?:me\s+)?(?:the\s+)?{RESOURCE_WORDS}\b"
+        )
+        if re.match(pattern, ql, re.I):
             weeks = self._extract_weeks(ql)
             aud = self._extract_audience(ql)
             return [
@@ -391,17 +401,47 @@ class QueryPlanner:
         # Rule-based multi-intent detection
         hits: List[Tuple[str, float]] = []
 
-        # Check for resources intent first
-        if re.search(rf"\b{RESOURCE_WORDS}\b", ql):
+        # Check for submission keywords (priority over resources)
+        has_submission_keyword = re.search(
+            r"\b(submission|submit|deliverable)\b", ql, re.I
+        )
+
+        # Create submission intent if submission keywords found
+        if has_submission_keyword:
             weeks = self._extract_weeks(ql)
             aud = self._extract_audience(ql)
-            hits.append(("resources", 0.9))
-            # same clause has resources and typical resource noun →
-            # remove submission duplicate intent
-            # (training form / slides etc. caught as submission also trigger
-            # clarify problem)
-            if RESOURCE_LIKE_NOUN.search(ql):
-                hits = [(i, s) for (i, s) in hits if i != "submission"]
+            hits.append(("submission", 0.9))
+
+        # Check for resources intent first
+        elif re.search(rf"\b{RESOURCE_WORDS}\b", ql):
+            weeks = self._extract_weeks(ql)
+            aud = self._extract_audience(ql)
+
+            if has_submission_keyword:
+                # Prioritize submission when submission keywords present
+                hits.append(("submission", 0.9))
+            else:
+                hits.append(("resources", 0.9))
+
+            # Improved resource vs submission duplicate detection
+            has_resource_noun = RESOURCE_LIKE_NOUN.search(ql)
+            has_resource_verb = re.search(rf"\b{RESOURCE_VERB_PREFIX}\b", ql)
+            has_action_verb = re.search(r"\b(submit|upload|due|deadline)\b", ql, re.I)
+
+            if has_resource_noun:
+                if has_submission_keyword:
+                    # Prioritize submission when submission keywords present
+                    hits = [(i, s) for (i, s) in hits if i != "resources"]
+                elif has_action_verb:
+                    # Prioritize submission when action verbs present (submit/
+                    # upload/due/deadline)
+                    hits = [(i, s) for (i, s) in hits if i != "resources"]
+                elif not has_resource_verb:
+                    # Pure noun enumeration without RESOURCE_VERB_PREFIX -> resources
+                    hits = [(i, s) for (i, s) in hits if i != "submission"]
+                else:
+                    # Keep existing logic for RESOURCE_VERB_PREFIX cases
+                    hits = [(i, s) for (i, s) in hits if i != "submission"]
         else:
             # weeks & audience extraction is only once
             weeks = self._extract_weeks(ql)
@@ -433,7 +473,7 @@ class QueryPlanner:
             pass
             # hits = [(i, s) for (i, s) in hits if i != "schedule"]
 
-        # 2) Strong rule: explicit join/match clauses with audience keywords ⇒
+        # 2) Strong rule: explicit join/match clauses with audience keywords =>
         # force schedule intents (no early return)
         forced_intents: List[QueryIntent] = []
         if re.search(r"\b(?:join|match(?:ed|ing)?)\b", ql):
@@ -477,7 +517,7 @@ class QueryPlanner:
             local_aud = aud
             if intent == "submission" and not local_aud:
                 local_aud = "engineer"
-                # demo/demoweek mentioned without explicit week → submission
+                # demo/demoweek mentioned without explicit week -> submission
                 # maps to Week 11
                 if not weeks and any(re.search(p, ql, re.I) for p in DEMO_SYNONYMS):
                     weeks = [11]
@@ -541,7 +581,7 @@ class QueryPlanner:
         extracted: Dict[str, Any] = {}
 
         if weeks:
-            # retrieval query filter is usually single week → if list, split by
+            # retrieval query filter is usually single week -> if list, split by
             # each week
             if len(weeks) == 1:
                 filters["week"] = weeks[0]
@@ -598,7 +638,8 @@ class QueryPlanner:
     def _check_clarification_needed(
         self, original_query: str, intents: List[QueryIntent]
     ) -> Tuple[bool, Optional[str]]:
-        # (0) certification context is independent of week → no clarification needed
+        # (0) certification context is independent of week -> no clarification
+        # needed
         if any(qi.intent == "certification" for qi in intents):
             return False, None
 
@@ -607,9 +648,10 @@ class QueryPlanner:
             if qi.intent in {"schedule", "tasks"}:
                 ws = qi.extracted_info.get("weeks")
                 if not ws:
-                    return True, "Which week are you referring to? (e.g., Week 3)"
+                    return (True,)
+                "Which week are you referring to? (e.g., Week 3)"
 
-        # 2) too many intents → clarify — if all weeks are specified, exception
+        # 2) too many intents -> clarify — if all weeks are specified, exception
         if len(intents) > 6:
             all_weeked = True
             for qi in intents:
@@ -645,7 +687,7 @@ class QueryPlanner:
             if isinstance(w, int):
                 all_weeks.add(w)
 
-        # (A) Discord resources → audience=engineer heuristic
+        # (A) Discord resources -> audience=engineer heuristic
         for qi in intents:
             if qi.intent == "resources" and "audience" not in qi.extracted_info:
                 if re.search(r"\bdiscord\b", qi.query, re.I):
@@ -653,7 +695,7 @@ class QueryPlanner:
                     qi.filters["audience"] = "engineer"
 
         # (1) tasks/requirement sentence has designer
-        # engineer → audience=designer first
+        # engineer -> audience=designer first
         for qi in intents:
             if qi.intent in {"tasks", "requirement"}:
                 s = qi.query.lower()
@@ -661,7 +703,7 @@ class QueryPlanner:
                     qi.extracted_info["audience"] = "designer"
                     qi.filters["audience"] = "designer"
 
-        # (B) Designer work week: "before engineers join in Week N" → Week N-1
+        # (B) Designer work week: "before engineers join in Week N" -> Week N-1
         BEFORE_ENG_JOIN = re.compile(
             r"before\s+engineers?\s+join\s+in\s+week\s+(\d{1,2})", re.I
         )
@@ -681,8 +723,10 @@ class QueryPlanner:
         # the sentence for aud, then force week
         JOIN_PAT = re.compile(r"\b(?:join|match(?:ed|ing)?)\b", re.I)
         NEAR_ROLE = re.compile(
-            r"(designers?|engineers?|developers?).{0,30}\b(?:join|match(?:ed|ing)?)\b|\
-            \b(?:join|match(?:ed|ing)?)\b.{0,30}(designers?|engineers?|developers?)",
+            r"(designers?|engineers?|developers?).{0,30}\
+            \b(?:join|match(?:ed|ing)?)\b|\
+            \b(?:join|match(?:ed|ing)?)\b.{0,30}\
+            \b.{0,30}(designers?|engineers?|developers?)",
             re.I,
         )
         for qi in intents:
@@ -787,7 +831,7 @@ class QueryPlanner:
                     re.search(p, qi.query, re.I) for p in DEMO_SYNONYMS + PITCH_SYNONYMS
                 )
                 if not ws and not named_event:
-                    # "this/that week" only, no number week → need clarification
+                    # "this/that week" only, no number week -> need clarification
                     if needs_week_phrase and len(all_weeks) == 0:
                         need_clarify = True
 
@@ -814,9 +858,9 @@ class QueryPlanner:
     ) -> List[QueryIntent]:
         """
         Extra late-stage tweaks that need to look across intents.
-        - Communication + onboarding-ish phrases → default to Week 1
+        - Communication + onboarding-ish phrases -> default to Week 1
         - join/match in the entire sentence, add missing side to schedule
-        (designer→W2, engineer→W4)
+        (designer->W2, engineer->W4)
         """
         txt = original_query.lower()
 
@@ -828,40 +872,8 @@ class QueryPlanner:
                     qi.extracted_info["weeks"] = [1]
                     qi.filters["week"] = 1
 
-        # (3) join/match enhancement: add missing side to schedule if role word
-        # appears in the entire sentence
-        if re.search(r"\b(?:join|match(?:ed|ing)?)\b", txt) and ROLE_WORD.search(txt):
-            have_designer = any(
-                qi.intent == "schedule"
-                and (
-                    qi.extracted_info.get("audience") == "designer"
-                    or qi.filters.get("audience") == "designer"
-                )
-                for qi in intents
-            )
-            have_engineer = any(
-                qi.intent == "schedule"
-                and (
-                    qi.extracted_info.get("audience") == "engineer"
-                    or qi.filters.get("audience") == "engineer"
-                )
-                for qi in intents
-            )
-            if re.search(r"\bdesigners?\b", txt) and not have_designer:
-                intents.append(
-                    self._make_intent(
-                        "schedule", original_query, 1.0, weeks=[2], audience="designer"
-                    )
-                )
-            if re.search(r"\b(engineers?|developers?)\b", txt) and not have_engineer:
-                intents.append(
-                    self._make_intent(
-                        "schedule", original_query, 1.0, weeks=[4], audience="engineer"
-                    )
-                )
-
-        # (3) join + roles in the entire sentence: add missing side to schedule
-        # (designer→W2, engineer→W4)
+        # (3) join/match enhancement: add missing side to schedule
+        # (designer->W2, engineer->W4)
         if re.search(r"\b(?:join|match(?:ed|ing)?)\b", txt):
             have_designer = any(
                 qi.intent == "schedule"
@@ -879,18 +891,37 @@ class QueryPlanner:
                 )
                 for qi in intents
             )
-            if ("designer" in txt) and not have_designer:
-                intents.append(
-                    self._make_intent(
-                        "schedule", original_query, 1.0, weeks=[2], audience="designer"
+
+            # Check for designer keywords (ROLE_WORD or direct text match)
+            if (ROLE_WORD.search(txt) and re.search(r"\bdesigners?\b", txt)) or (
+                "designer" in txt
+            ):
+                if not have_designer:
+                    intents.append(
+                        self._make_intent(
+                            "schedule",
+                            original_query,
+                            1.0,
+                            weeks=[2],
+                            audience="designer",
+                        )
                     )
-                )
-            if ("engineer" in txt or "developers" in txt) and not have_engineer:
-                intents.append(
-                    self._make_intent(
-                        "schedule", original_query, 1.0, weeks=[4], audience="engineer"
+
+            # Check for engineer keywords (ROLE_WORD or direct text match)
+            if (
+                ROLE_WORD.search(txt)
+                and re.search(r"\b(engineers?|developers?)\b", txt)
+            ) or ("engineer" in txt or "developers" in txt):
+                if not have_engineer:
+                    intents.append(
+                        self._make_intent(
+                            "schedule",
+                            original_query,
+                            1.0,
+                            weeks=[4],
+                            audience="engineer",
+                        )
                     )
-                )
 
         # align sorting stability
         intents.sort(

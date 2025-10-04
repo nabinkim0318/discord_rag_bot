@@ -7,6 +7,7 @@ Enhanced chunking system
 - Summary and keyword extraction
 """
 
+import hashlib
 import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
@@ -20,7 +21,7 @@ class ChunkMetadata:
     week: Optional[int] = None
     topic: Optional[str] = None
     audience: str = "all"  # engineer, pm, designer, all
-    links: List[str] = None
+    links: List[Dict[str, str]] = None
     anchor_heading: Optional[str] = None
     summary: Optional[str] = None
     keywords: List[str] = None
@@ -51,10 +52,29 @@ class EnhancedChunker:
 
         # Document type detection pattern
         self.doc_type_patterns = {
-            "faq": [r"FAQ", r"Q\s*&\s*A", r"자주\s*묻는\s*질문", r"질문\s*답변"],
-            "schedule": [r"일정", r"스케줄", r"주차", r"week", r"타임라인", r"마감"],
-            "process": [r"프로세스", r"절차", r"가이드", r"방법", r"절차"],
-            "resources": [r"리소스", r"자료", r"링크", r"훈련", r"트레이닝", r"코스"],
+            "faq": [
+                r"FAQ",
+                r"Q\s*&\s*A",
+                r"frequently\s*asked\s*questions",
+                r"questions\s*and\s*answers",
+            ],
+            "schedule": [
+                r"schedule",
+                r"timetable",
+                r"week",
+                r"week",
+                r"timeline",
+                r"deadline",
+            ],
+            "process": [r"process", r"procedure", r"guide", r"method", r"steps"],
+            "resources": [
+                r"resources",
+                r"materials",
+                r"links",
+                r"training",
+                r"training",
+                r"course",
+            ],
         }
 
         # Heading pattern
@@ -113,33 +133,56 @@ class EnhancedChunker:
         return "general"
 
     def _split_by_headings(self, content: str) -> List[Dict[str, Any]]:
-        """Split document by heading"""
+        """Split document by heading with improved underline detection"""
         lines = content.split("\n")
         sections = []
         current_section = {"heading": None, "content": [], "level": 0}
 
-        for line in lines:
-            # Heading detection
-            heading_match = None
-            for pattern in self.heading_patterns:
-                match = re.match(pattern, line.strip())
-                if match:
-                    heading_match = match
-                    break
+        i = 0
+        while i < len(lines):
+            line = lines[i]
 
-            if heading_match:
+            # Check for underline heading (2-line pattern)
+            is_underline_heading = False
+            heading_text = None
+
+            if i < len(lines) - 1:
+                next_line = lines[i + 1]
+                # Check for underline patterns: Title\n===== or Title\n-----
+                if re.match(r"^={3,}$", next_line.strip()) or re.match(
+                    r"^-{3,}$", next_line.strip()
+                ):
+                    heading_text = line.strip()
+                    is_underline_heading = True
+                    i += 1  # Skip the underline line
+
+            # Single line heading detection
+            if not is_underline_heading:
+                heading_match = None
+                for pattern in self.heading_patterns:
+                    match = re.match(pattern, line.strip())
+                    if match:
+                        heading_match = match
+                        break
+
+                if heading_match:
+                    heading_text = heading_match.group(1).strip()
+
+            if heading_text:
                 # Save previous section
                 if current_section["content"]:
                     sections.append(current_section)
 
                 # Start new section
                 current_section = {
-                    "heading": heading_match.group(1).strip(),
+                    "heading": heading_text,
                     "content": [line],
                     "level": self._get_heading_level(line),
                 }
             else:
                 current_section["content"].append(line)
+
+            i += 1
 
         # Save last section
         if current_section["content"]:
@@ -179,7 +222,8 @@ class EnhancedChunker:
         # Q&A pattern to split
         qa_patterns = [
             r"Q\s*:\s*(.+?)\s*A\s*:\s*(.+?)(?=Q\s*:|$)",
-            r"질문\s*:\s*(.+?)\s*답변\s*:\s*(.+?)(?=질문\s*:|$)",  # Q&A pattern
+            # Q&A pattern
+            r"question\s*:\s*(.+?)\s*answer\s*:\s*(.+?)(?=question\s*:|$)",
             r"(.+?)\?\s*(.+?)(?=\n\n|\n[A-Z]|$)",
         ]
 
@@ -201,10 +245,15 @@ class EnhancedChunker:
                     links=self._extract_links(qa_content),
                 )
 
+                # Generate stable chunk ID based on content hash
+                content_hash = hashlib.sha1(qa_content.encode("utf-8")).hexdigest()[:8]
+                chunk_id = f"{source}_faq_{content_hash}"
+                chunk_uid = f"{source}#{content_hash}"
+
                 chunk = EnhancedChunk(
                     content=qa_content,
-                    chunk_id=f"{source}_faq_{i}",
-                    chunk_uid=f"{source}#faq_{i}",
+                    chunk_id=chunk_id,
+                    chunk_uid=chunk_uid,
                     source=source,
                     page=page,
                     metadata=metadata,
@@ -248,10 +297,17 @@ class EnhancedChunker:
                     links=self._extract_links(chunk_content),
                 )
 
+                # Generate stable chunk ID based on content hash
+                content_hash = hashlib.sha1(chunk_content.encode("utf-8")).hexdigest()[
+                    :8
+                ]
+                chunk_id = f"{source}_chunk_{content_hash}"
+                chunk_uid = f"{source}#{content_hash}"
+
                 chunk = EnhancedChunk(
                     content=chunk_content,
-                    chunk_id=f"{source}_chunk_{chunk_index}",
-                    chunk_uid=f"{source}#chunk_{chunk_index}",
+                    chunk_id=chunk_id,
+                    chunk_uid=chunk_uid,
                     source=source,
                     page=page,
                     metadata=metadata,
@@ -263,36 +319,71 @@ class EnhancedChunker:
                 current_chunk_words = overlap_words
                 chunk_index += 1
 
-        # Last chunk processing
-        if current_chunk_words and len(current_chunk_words) >= self.min_chunk_size:
+        # Last chunk processing with short chunk handling
+        if current_chunk_words:
             chunk_content = " ".join(current_chunk_words)
 
-            metadata = ChunkMetadata(
-                doc_type=doc_type,
-                week=self._extract_week(chunk_content),
-                topic=self._extract_topic(chunk_content),
-                audience=self._extract_audience(chunk_content),
-                anchor_heading=heading,
-                summary=self._generate_summary(chunk_content),
-                keywords=self._extract_keywords(chunk_content),
-                links=self._extract_links(chunk_content),
-            )
+            # Check if last chunk is too short and merge with previous chunk
+            if len(current_chunk_words) < self.min_chunk_size and chunks:
+                # Merge with previous chunk
+                prev_chunk = chunks[-1]
+                merged_content = prev_chunk.content + " " + chunk_content
 
-            chunk = EnhancedChunk(
-                content=chunk_content,
-                chunk_id=f"{source}_chunk_{chunk_index}",
-                chunk_uid=f"{source}#chunk_{chunk_index}",
-                source=source,
-                page=page,
-                metadata=metadata,
-            )
-            chunks.append(chunk)
+                # Update previous chunk with merged content
+                merged_metadata = ChunkMetadata(
+                    doc_type=doc_type,
+                    week=self._extract_week(merged_content),
+                    topic=self._extract_topic(merged_content),
+                    audience=self._extract_audience(merged_content),
+                    anchor_heading=heading,
+                    summary=self._generate_summary(merged_content),
+                    keywords=self._extract_keywords(merged_content),
+                    links=self._extract_links(merged_content),
+                )
+
+                # Generate new stable ID for merged content
+                merged_hash = hashlib.sha1(merged_content.encode("utf-8")).hexdigest()[
+                    :8
+                ]
+                prev_chunk.content = merged_content
+                prev_chunk.chunk_id = f"{source}_chunk_{merged_hash}"
+                prev_chunk.chunk_uid = f"{source}#{merged_hash}"
+                prev_chunk.metadata = merged_metadata
+            else:
+                # Create new chunk if it's long enough or no previous chunks
+                metadata = ChunkMetadata(
+                    doc_type=doc_type,
+                    week=self._extract_week(chunk_content),
+                    topic=self._extract_topic(chunk_content),
+                    audience=self._extract_audience(chunk_content),
+                    anchor_heading=heading,
+                    summary=self._generate_summary(chunk_content),
+                    keywords=self._extract_keywords(chunk_content),
+                    links=self._extract_links(chunk_content),
+                )
+
+                # Generate stable chunk ID based on content hash
+                content_hash = hashlib.sha1(chunk_content.encode("utf-8")).hexdigest()[
+                    :8
+                ]
+                chunk_id = f"{source}_chunk_{content_hash}"
+                chunk_uid = f"{source}#{content_hash}"
+
+                chunk = EnhancedChunk(
+                    content=chunk_content,
+                    chunk_id=chunk_id,
+                    chunk_uid=chunk_uid,
+                    source=source,
+                    page=page,
+                    metadata=metadata,
+                )
+                chunks.append(chunk)
 
         return chunks
 
     def _extract_week(self, content: str) -> Optional[int]:
         """Extract week information"""
-        patterns = [r"week\s*(\d+)", r"주차\s*(\d+)", r"(\d+)\s*주차"]  # Week patterns
+        patterns = [r"week\s*(\d+)", r"week\s*(\d+)", r"(\d+)\s*week"]  # Week patterns
 
         for pattern in patterns:
             match = re.search(pattern, content.lower())
@@ -307,11 +398,11 @@ class EnhancedChunker:
     def _extract_topic(self, content: str) -> Optional[str]:
         """Extract topic (simple keyword based)"""
         topics = {
-            "pitch": ["pitch", "피치", "발표"],  # Pitch keywords
-            "team": ["team", "팀", "매칭"],  # Team keywords
-            "visa": ["visa", "비자", "opt", "cpt"],
-            "training": ["training", "훈련", "트레이닝"],
-            "schedule": ["schedule", "일정", "스케줄"],
+            "pitch": ["pitch", "presentation", "demo"],  # Pitch keywords
+            "team": ["team", "matching", "collaboration"],  # Team keywords
+            "visa": ["visa", "immigration", "opt", "cpt"],
+            "training": ["training", "education", "learning"],
+            "schedule": ["schedule", "timetable", "calendar"],
         }
 
         content_lower = content.lower()
@@ -322,36 +413,97 @@ class EnhancedChunker:
         return None
 
     def _extract_audience(self, content: str) -> str:
-        """Extract audience"""
+        """Extract audience with improved keyword coverage"""
         content_lower = content.lower()
 
+        # Engineering keywords (removed duplicate "engineer")
         if any(
             kw in content_lower
-            for kw in ["engineer", "engineer", "development", "coding"]
+            for kw in [
+                "engineer",
+                "development",
+                "coding",
+                "programming",
+                "software",
+                "backend",
+                "frontend",
+                "fullstack",
+            ]
         ):
             return "engineer"
+        # Data Science / ML keywords
         elif any(
-            kw in content_lower for kw in ["pm", "product", "product", "planning"]
+            kw in content_lower
+            for kw in [
+                "data scientist",
+                "data science",
+                "ml",
+                "machine learning",
+                "ai",
+                "analytics",
+                "ds",
+                "data analyst",
+            ]
+        ):
+            return "data_scientist"
+        # Product Management keywords (removed duplicate "product")
+        elif any(
+            kw in content_lower
+            for kw in [
+                "pm",
+                "product",
+                "planning",
+                "strategy",
+                "roadmap",
+                "product manager",
+            ]
         ):
             return "pm"
-        elif any(kw in content_lower for kw in ["designer", "design", "ui", "ux"]):
+        # Design keywords
+        elif any(
+            kw in content_lower
+            for kw in [
+                "designer",
+                "design",
+                "ui",
+                "ux",
+                "user experience",
+                "user interface",
+            ]
+        ):
             return "designer"
+        # Operations keywords
+        elif any(
+            kw in content_lower
+            for kw in [
+                "ops",
+                "operations",
+                "devops",
+                "sre",
+                "infrastructure",
+                "deployment",
+            ]
+        ):
+            return "operations"
 
         return "all"
 
-    def _extract_links(self, content: str) -> List[str]:
-        """Extract links"""
+    def _extract_links(self, content: str) -> List[Dict[str, str]]:
+        """Extract links in standardized format"""
         links = []
 
         for pattern in self.link_patterns:
             matches = re.finditer(pattern, content)
             for match in matches:
                 if len(match.groups()) == 2:
-                    # <title|url> format
-                    links.append(f"{match.group(1)}|{match.group(2)}")
+                    # <title|url> format or markdown link [title](url)
+                    title = match.group(1).strip()
+                    url = match.group(2).strip()
+                    links.append({"title": title, "url": url})
                 else:
-                    # URL only
-                    links.append(match.group(1))
+                    # URL only - use URL as title
+                    url = match.group(1).strip()
+                    links.append({"title": url, "url": url})
 
         return links
 
@@ -412,3 +564,119 @@ def chunk_document(
 ) -> List[EnhancedChunk]:
     """Document chunking (convenience function)"""
     return enhanced_chunker.chunk_document(content, source, page)
+
+
+def validate_enhanced_chunk_data(
+    chunks: List[EnhancedChunk], original_text: str
+) -> Dict[str, Any]:
+    """
+    Validate enhanced chunk data integrity and statistics
+
+    Args:
+        chunks: List of enhanced chunks to validate
+        original_text: Original text for offset validation
+
+    Returns:
+        Dict with validation results and statistics
+    """
+    validation_results = {
+        "offset_integrity_passed": True,
+        "id_stability_passed": True,
+        "length_stats": {},
+        "integration_check_passed": True,
+        "errors": [],
+    }
+
+    # 1. Offset integrity check (for enhanced chunks, we check content consistency)
+    for i, chunk in enumerate(chunks):
+        try:
+            # For enhanced chunks, we validate that the content is reasonable
+            assert len(chunk.content.strip()) > 0, f"Chunk {i}: empty content"
+            assert chunk.chunk_id is not None, f"Chunk {i}: missing chunk_id"
+            assert chunk.chunk_uid is not None, f"Chunk {i}: missing chunk_uid"
+        except AssertionError as e:
+            validation_results["offset_integrity_passed"] = False
+            validation_results["errors"].append(
+                f"Enhanced chunk integrity error in chunk {i}: {str(e)}"
+            )
+
+    # 2. Length statistics
+    chunk_lengths = [len(chunk.content) for chunk in chunks]
+    if chunk_lengths:
+        sorted_lengths = sorted(chunk_lengths)
+        n = len(sorted_lengths)
+        p10 = sorted_lengths[max(0, int(0.10 * n) - 1)]
+        p90 = sorted_lengths[min(n - 1, int(0.90 * n) - 1)]
+        mean_length = sum(chunk_lengths) / len(chunk_lengths)
+        min_length = min(chunk_lengths)
+        max_length = max(chunk_lengths)
+
+        validation_results["length_stats"] = {
+            "count": len(chunk_lengths),
+            "mean": mean_length,
+            "p10": p10,
+            "p90": p90,
+            "min": min_length,
+            "max": max_length,
+            "p10_p90_in_range": 300 <= p10 and p90 <= 1000,
+        }
+
+        # Check if p10/p90 are in expected range (300-1000 chars)
+        if not (300 <= p10 and p90 <= 1000):
+            validation_results["errors"].append(
+                f"Length stats out of range: p10={p10}, p90={p90}"
+            )
+
+    # 3. Integration check - verify required fields for hybrid indexer
+    required_fields = ["source", "page"]
+    for i, chunk in enumerate(chunks):
+        missing_fields = [
+            field for field in required_fields if getattr(chunk, field, None) is None
+        ]
+        if missing_fields:
+            validation_results["integration_check_passed"] = False
+            validation_results["errors"].append(
+                f"Enhanced chunk {i} missing required fields: {missing_fields}"
+            )
+
+        # Check metadata structure
+        if chunk.metadata:
+            metadata_required = ["doc_type", "audience"]
+            missing_metadata = [
+                field
+                for field in metadata_required
+                if not hasattr(chunk.metadata, field)
+            ]
+            if missing_metadata:
+                validation_results["integration_check_passed"] = False
+                validation_results["errors"].append(
+                    f"Enhanced chunk {i} metadata missing fields: {missing_metadata}"
+                )
+
+    return validation_results
+
+
+def test_enhanced_id_stability(
+    chunker_func, content: str, source: str, **kwargs
+) -> bool:
+    """
+    Test enhanced chunker ID stability by running twice and comparing chunk_uid sets
+
+    Args:
+        chunker_func: Enhanced chunking function to test
+        content: Input content
+        source: Document source
+        **kwargs: Additional arguments for chunker
+
+    Returns:
+        bool: True if IDs are stable, False otherwise
+    """
+    # Run chunker twice
+    chunks1 = chunker_func(content, source, **kwargs)
+    chunks2 = chunker_func(content, source, **kwargs)
+
+    # Extract chunk_uid sets
+    uids1 = {chunk.chunk_uid for chunk in chunks1}
+    uids2 = {chunk.chunk_uid for chunk in chunks2}
+
+    return uids1 == uids2

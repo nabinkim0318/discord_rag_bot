@@ -4,12 +4,13 @@ Feedback service for handling user feedback on RAG responses
 
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.logging import logger
+from app.core.metrics import feedback_submissions
 from app.db.session import engine
 
 
@@ -50,14 +51,31 @@ class FeedbackService:
 
             # Insert feedback
             feedback_id = str(uuid.uuid4())
-            query = text(
+            # Check if score column exists, otherwise use feedback column
+            with self.engine.connect() as conn:
+                result = conn.execute(text("PRAGMA table_info(feedback)"))
+                columns = [col[1] for col in result.fetchall()]
+                has_score_column = "score" in columns
+
+            if has_score_column:
+                # Use both score and feedback columns for compatibility
+                query = text(
+                    """
+                    INSERT INTO feedback (id, query_id, user_id,
+                    score, feedback, comment, created_at)
+                    VALUES (:id, :query_id, :user_id, :score, :score,
+                    :comment, :created_at)
                 """
-                INSERT INTO feedback (id, query_id, user_id,
-                score, comment, created_at)
-                VALUES (:id, :query_id, :user_id, :score,
-                :comment, :created_at)
-            """
-            )
+                )
+            else:
+                query = text(
+                    """
+                    INSERT INTO feedback (id, query_id, user_id,
+                    feedback, comment, created_at)
+                    VALUES (:id, :query_id, :user_id, :score,
+                    :comment, :created_at)
+                """
+                )
 
             with self.engine.connect() as conn:
                 conn.execute(
@@ -74,6 +92,10 @@ class FeedbackService:
                 conn.commit()
 
             logger.info(f"Feedback submitted: {feedback_id} for query {query_id}")
+
+            # Record metrics
+            feedback_submissions.labels(score=score).inc()
+
             return True, "Feedback submitted successfully"
 
         except SQLAlchemyError as e:
@@ -94,14 +116,30 @@ class FeedbackService:
             Dictionary with up/down counts
         """
         try:
-            query = text(
+            # Check if score column exists, otherwise use feedback column
+            with self.engine.connect() as conn:
+                result = conn.execute(text("PRAGMA table_info(feedback)"))
+                columns = [col[1] for col in result.fetchall()]
+                has_score_column = "score" in columns
+
+            if has_score_column:
+                query = text(
+                    """
+                    SELECT score, COUNT(*) as count
+                    FROM feedback
+                    WHERE query_id = :query_id
+                    GROUP BY score
                 """
-                SELECT score, COUNT(*) as count
-                FROM feedback
-                WHERE query_id = :query_id
-                GROUP BY score
-            """
-            )
+                )
+            else:
+                query = text(
+                    """
+                    SELECT feedback as score, COUNT(*) as count
+                    FROM feedback
+                    WHERE query_id = :query_id
+                    GROUP BY feedback
+                """
+                )
 
             with self.engine.connect() as conn:
                 result = conn.execute(query, {"query_id": query_id}).fetchall()
@@ -131,17 +169,37 @@ class FeedbackService:
             List of feedback records
         """
         try:
-            query = text(
+            # Check if score column exists, otherwise use feedback column
+            with self.engine.connect() as conn:
+                result = conn.execute(text("PRAGMA table_info(feedback)"))
+                columns = [col[1] for col in result.fetchall()]
+                has_score_column = "score" in columns
+
+            if has_score_column:
+                query = text(
+                    """
+                    SELECT f.id, f.query_id, f.score, f.comment, f.created_at,
+                           q.query AS question, q.answer AS response
+                    FROM feedback f
+                    JOIN queries q ON f.query_id = q.id
+                    WHERE f.user_id = :user_id
+                    ORDER BY f.created_at DESC
+                    LIMIT :limit
                 """
-                SELECT f.id, f.query_id, f.score, f.comment, f.created_at,
-                       q.query AS question, q.answer AS response
-                FROM feedback f
-                JOIN queries q ON f.query_id = q.id
-                WHERE f.user_id = :user_id
-                ORDER BY f.created_at DESC
-                LIMIT :limit
-            """
-            )
+                )
+            else:
+                query = text(
+                    """
+                    SELECT f.id, f.query_id, f.feedback as score,
+                            f.comment, f.created_at,
+                           q.query AS question, q.answer AS response
+                    FROM feedback f
+                    JOIN queries q ON f.query_id = q.id
+                    WHERE f.user_id = :user_id
+                    ORDER BY f.created_at DESC
+                    LIMIT :limit
+                """
+                )
 
             with self.engine.connect() as conn:
                 result = conn.execute(
@@ -150,13 +208,20 @@ class FeedbackService:
 
             feedback_list = []
             for row in result:
+                # Handle created_at field safely
+                created_at = row.created_at
+                if hasattr(created_at, "isoformat"):
+                    created_at_str = created_at.isoformat()
+                else:
+                    created_at_str = str(created_at)
+
                 feedback_list.append(
                     {
                         "id": str(row.id),
                         "query_id": str(row.query_id),
                         "score": row.score,
                         "comment": row.comment,
-                        "created_at": row.created_at.isoformat(),
+                        "created_at": created_at_str,
                         "question": row.question,
                         "response": row.response,
                     }
@@ -200,7 +265,7 @@ class FeedbackService:
             logger.error(f"Error checking feedback existence: {e}")
             return False
 
-    def get_feedback_summary(self, days: int = 7) -> Dict[str, any]:
+    def get_feedback_summary(self, days: int = 7) -> Dict[str, Any]:
         """
         Get feedback summary for the last N days
 
@@ -211,20 +276,40 @@ class FeedbackService:
             Dictionary with summary statistics
         """
         try:
-            query = text(
-                """
-                SELECT
-                    COUNT(*) as total_feedback,
-                    SUM(CASE WHEN score = 'up' THEN 1 ELSE 0 END) as up_votes,
-                    SUM(CASE WHEN score = 'down' THEN 1 ELSE 0 END) as down_votes,
-                    COUNT(DISTINCT user_id) as unique_users,
-                    COUNT(DISTINCT message_id) as unique_messages
-                FROM feedback
-                WHERE created_at >= datetime('now', '-{} days')
-            """.format(
-                    days
+            # Check if score column exists, otherwise use feedback column
+            with self.engine.connect() as conn:
+                result = conn.execute(text("PRAGMA table_info(feedback)"))
+                columns = [col[1] for col in result.fetchall()]
+                has_score_column = "score" in columns
+
+            if has_score_column:
+                query = text(
+                    """
+                    SELECT
+                        COUNT(*) as total_feedback,
+                        SUM(CASE WHEN score = 'up' THEN 1 ELSE 0 END) as up_votes,
+                        SUM(CASE WHEN score = 'down' THEN 1 ELSE 0 END) as down_votes,
+                        COUNT(DISTINCT user_id) as unique_users,
+                        COUNT(DISTINCT query_id) as unique_messages
+                    FROM feedback
+                    WHERE created_at >= datetime('now', '-{} days')
+                """.format(days)
                 )
-            )
+            else:
+                query = text(
+                    """
+                    SELECT
+                        COUNT(*) as total_feedback,
+                        SUM(CASE WHEN feedback = 'up' THEN 1 ELSE 0 END)
+                            as up_votes,
+                        SUM(CASE WHEN feedback = 'down' THEN 1 ELSE 0 END)
+                            as down_votes,
+                        COUNT(DISTINCT user_id) as unique_users,
+                        COUNT(DISTINCT query_id) as unique_messages
+                    FROM feedback
+                    WHERE created_at >= datetime('now', '-{} days')
+                """.format(days)
+                )
 
             with self.engine.connect() as conn:
                 result = conn.execute(query).fetchone()

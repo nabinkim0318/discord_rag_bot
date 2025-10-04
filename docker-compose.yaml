@@ -39,6 +39,8 @@ services:
     container_name: discord-rag-api
     env_file:
       - ./.env
+    environment:
+      - SERVICE_CONTEXT=backend
     volumes:
       - ./backend:/app # Safe for global installation
       - ./rag_agent:/app/rag_agent
@@ -97,6 +99,8 @@ services:
     container_name: discord-rag-bot
     env_file:
       - ./.env
+    environment:
+      - SERVICE_CONTEXT=bot
     volumes:
       - ./bots:/app
     depends_on:

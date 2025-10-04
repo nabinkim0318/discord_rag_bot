@@ -1,3 +1,4 @@
+from rag_agent.core.logging import logger
 from rag_agent.indexing.hybrid_indexer import hybrid_index, sample_chunk_uids
 from rag_agent.ingestion.chunker import chunk_text
 
@@ -21,9 +22,9 @@ stats = hybrid_index(
     embed_model=None,  # OpenAI key exists, use None and default model
     weaviate_enabled=True,
 )
-print(stats)  # {'sqlite_upserts':..., 'weaviate_upserts':...,
+logger.info(stats)  # {'sqlite_upserts':..., 'weaviate_upserts':...,
 # 'sqlite_table_count':..., 'sqlite_fts_count':...}
 
 # Random sample uid for cross-check
 uids = sample_chunk_uids([c.to_dict() for c in chunks], n=5)
-print("SAMPLE UIDs:", uids)
+logger.info(f"SAMPLE UIDs: {uids}")

@@ -212,3 +212,56 @@ def run_rag_pipeline(
         }
     )
     return answer, contexts, meta
+
+
+def search_similar_documents(
+    query: str, top_k: int = 5, filters: Optional[Dict[str, Any]] = None
+) -> List[Dict[str, Any]]:
+    """
+    Search for similar documents using vector similarity.
+    This is a placeholder implementation.
+    """
+    logger.warning("Using mock search_similar_documents - rag_agent not available")
+
+    # Mock implementation
+    mock_results = [
+        {
+            "chunk_uid": f"mock-chunk-{i}",
+            "text": f"Mock document content {i} for query: {query[:30]}...",
+            "score": 0.9 - (i * 0.1),
+            "source": f"mock_document_{i}.pdf",
+            "metadata": {"page": i + 1, "section": "content"},
+        }
+        for i in range(min(top_k, 3))
+    ]
+
+    return mock_results
+
+
+def call_llm(
+    prompt: str,
+    model: str = "gpt-3.5-turbo",
+    temperature: float = 0.7,
+    max_tokens: int = 1000,
+) -> str:
+    """
+    Call the LLM with the given prompt.
+    This is a placeholder implementation.
+    """
+    logger.warning("Using mock call_llm - rag_agent not available")
+
+    # Mock implementation
+    return f"Mock LLM response for prompt: {prompt[:50]}..."
+
+
+def store_rag_result_in_weaviate(
+    query: str, answer: str, contexts: List[str], metadata: Dict[str, Any]
+) -> bool:
+    """
+    Store RAG result in Weaviate vector database.
+    This is a placeholder implementation.
+    """
+    logger.warning("Using mock store_rag_result_in_weaviate - rag_agent not available")
+
+    # Mock implementation - always return success
+    return True

@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from rag_agent.core.logging import logger
 from rag_agent.indexing.hybrid_indexer import hybrid_index, sample_chunk_uids
 from rag_agent.ingestion.chunker import chunk_text
 from rag_agent.ingestion.loader import load_pdf_to_pages
@@ -47,10 +48,10 @@ def main():
         embed_model=None,  # Use OpenAI if OPENAI_API_KEY available, otherwise pseudo
         weaviate_enabled=not args.no_weaviate,
     )
-    print("[index] stats:", stats)
+    logger.info(f"[index] stats: {stats}")
 
     uids = sample_chunk_uids([c.to_dict() for c in chunks], n=5)
-    print("[index] sample chunk_uids:", uids)
+    logger.info(f"[index] sample chunk_uids: {uids}")
 
 
 if __name__ == "__main__":

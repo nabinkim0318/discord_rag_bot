@@ -47,7 +47,7 @@ def _openai_client() -> Optional[OpenAI]:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         return None
-    base_url = os.getenv("OPENAI_BASE_URL") or None  # ✅ compatible endpoint support
+    base_url = os.getenv("OPENAI_BASE_URL") or None  # compatible endpoint support
     try:
         return OpenAI(api_key=api_key, base_url=base_url)
     except Exception as e:

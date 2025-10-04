@@ -1,6 +1,6 @@
 # ======== Project Setup ========
 
-.PHONY: install-backend install-rag install-frontend backend-setup rag-setup frontend-setup clean lint-backend lint-rag lint-frontend format-backend format-rag format-frontend test-backend test-rag test-frontend run-backend run-rag run-frontend lock-backend lock-rag update-backend update-rag update-frontend check-backend check-rag check-frontend precommit-backend precommit-rag precommit-frontend commit
+.PHONY: install-backend install-rag install-frontend backend-setup rag-setup frontend-setup clean lint-backend lint-rag lint-frontend format-backend format-rag format-frontend test-backend test-rag test-frontend run-backend run-rag run-frontend lock-backend lock-rag update-backend update-rag update-frontend check-backend check-rag check-frontend precommit-backend precommit-rag precommit-frontend commit env-check env-init db-init
 
 # ==== Install Dependencies ====
 install: install-backend install-rag install-frontend
@@ -27,6 +27,31 @@ rag-setup:
 frontend-setup:
 	cd frontend && npm install
 
+# ======== Environment & Database ========
+
+env-check:
+	@echo "🔍 Checking environment variables..."
+	python scripts/check_env.py
+
+env-init:
+	@echo "📝 Initializing environment..."
+	@if [ ! -f .env ]; then \
+		echo "📋 Copying env.template to .env..."; \
+		cp env.template .env; \
+		echo "✅ Created .env file from template"; \
+		echo "⚠️  Please edit .env file with your actual values"; \
+	else \
+		echo "✅ .env file already exists"; \
+	fi
+
+db-init:
+	@echo "🗄️  Initializing database..."
+	python scripts/init_db.py
+
+db-init-alembic:
+	@echo "🗄️  Initializing database with Alembic..."
+	INIT_ALEMBIC=true python scripts/init_db.py
+
 # ======== Development ========
 lint: lint-backend lint-rag lint-frontend
 
@@ -45,19 +70,64 @@ lint-frontend:
 
 format: format-backend format-rag format-frontend format-all
 
+# 🎯 최적의 포맷팅 도구 조합 (자동화) - 빠른 버전
 format-backend:
-	cd backend && poetry run isort --profile black .
-	cd backend && poetry run black .
+	@echo "🎨 포맷팅 Backend 코드..."
+	cd backend && poetry run isort --profile black --line-length 88 .
+	cd backend && poetry run black --line-length 88 .
+	cd backend && poetry run ruff check --fix --line-length 88 .
 
 format-rag:
-	cd rag_agent && poetry run isort --profile black .
-	cd rag_agent && poetry run black .
+	@echo "🎨 포맷팅 RAG Agent 코드..."
+	cd rag_agent && poetry run isort --profile black --line-length 88 .
+	cd rag_agent && poetry run black --line-length 88 .
+	cd rag_agent && poetry run ruff check --fix --line-length 88 .
+
+# 🎯 고급 포맷팅 (yapf 포함) - 느릴 수 있음
+format-backend-advanced:
+	@echo "🎨 고급 포맷팅 Backend 코드..."
+	cd backend && poetry run isort --profile black --line-length 88 .
+	cd backend && poetry run black --line-length 88 .
+	cd backend && poetry run yapf --in-place --recursive --style='{based_on_style: pep8, column_limit: 88}' .
+	cd backend && poetry run ruff check --fix --line-length 88 .
+
+format-rag-advanced:
+	@echo "🎨 고급 포맷팅 RAG Agent 코드..."
+	cd rag_agent && poetry run isort --profile black --line-length 88 .
+	cd rag_agent && poetry run black --line-length 88 .
+	cd rag_agent && poetry run yapf --in-place --recursive --style='{based_on_style: pep8, column_limit: 88}' .
+	cd rag_agent && poetry run ruff check --fix --line-length 88 .
 
 format-frontend:
+	@echo "🎨 포맷팅 Frontend 코드..."
 	cd frontend && npm run format
 
 format-all:
+	@echo "🎨 전체 프로젝트 포맷팅..."
 	npx prettier --write .
+	$(MAKE) format-backend
+	$(MAKE) format-rag
+
+# 🔍 포맷팅 검사 (CI/CD용)
+format-check: format-check-backend format-check-rag format-check-frontend
+
+format-check-backend:
+	@echo "🔍 Backend 포맷팅 검사..."
+	cd backend && poetry run isort --check-only --profile black --line-length 88 .
+	cd backend && poetry run black --check --line-length 88 .
+	cd backend && poetry run ruff check --line-length 88 .
+	cd backend && poetry run flake8 --max-line-length=88 --extend-ignore=E203,W503 .
+
+format-check-rag:
+	@echo "🔍 RAG Agent 포맷팅 검사..."
+	cd rag_agent && poetry run isort --check-only --profile black --line-length 88 .
+	cd rag_agent && poetry run black --check --line-length 88 .
+	cd rag_agent && poetry run ruff check --line-length 88 .
+	cd rag_agent && poetry run flake8 --max-line-length=88 --extend-ignore=E203,W503 .
+
+format-check-frontend:
+	@echo "🔍 Frontend 포맷팅 검사..."
+	cd frontend && npm run format:check
 
 test: test-backend test-rag test-frontend
 

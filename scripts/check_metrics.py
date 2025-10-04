@@ -5,6 +5,7 @@ Simple metrics check script
 from datetime import datetime
 
 import requests
+from rag_agent.core.logging import logger
 
 
 def check_metrics():
@@ -12,18 +13,18 @@ def check_metrics():
     try:
         # Backend API health check
         health_response = requests.get("http://localhost:8001/health")
-        print(f"🏥 Backend Health: {health_response.status_code}")
+        logger.info(f"🏥 Backend Health: {health_response.status_code}")
 
         # Metrics endpoint
         metrics_response = requests.get("http://localhost:8001/metrics")
         if metrics_response.status_code == 200:
-            print("📊 Metrics available at: http://localhost:8001/metrics")
+            logger.info("📊 Metrics available at: http://localhost:8001/metrics")
 
             # Simple metrics parsing
             metrics_text = metrics_response.text
             lines = metrics_text.split("\n")
 
-            print("\n📈 Key Metrics:")
+            logger.info("\n📈 Key Metrics:")
             for line in lines:
                 if any(
                     keyword in line
@@ -35,18 +36,18 @@ def check_metrics():
                     ]
                 ):
                     if not line.startswith("#"):
-                        print(f"  {line}")
+                        logger.info(f"  {line}")
         else:
-            print(f"❌ Metrics not available: {metrics_response.status_code}")
+            logger.warning(f"❌ Metrics not available: {metrics_response.status_code}")
 
     except requests.exceptions.ConnectionError:
-        print("❌ Backend API not running. Start with:")
-        print(
+        logger.warning("❌ Backend API not running. Start with:")
+        logger.warning(
             "cd backend && poetry run uvicorn app.main:app \
             --host 0.0.0.0 --port 8001 --reload"
         )
 
 
 if __name__ == "__main__":
-    print(f"🔍 Checking metrics at {datetime.now()}")
+    logger.info(f"🔍 Checking metrics at {datetime.now()}")
     check_metrics()

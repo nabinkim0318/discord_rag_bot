@@ -28,14 +28,15 @@ from interactions import (
 )
 from interactions.api.http import Forbidden
 from metrics import RAG_FAILURES, RAG_LATENCY, RAG_TOTAL
+from rag_agent.core.logging import logger
 
 # add project root to Python path
 project_root = Path(__file__).parent.parent
-print(project_root)
+logger.info(project_root)
 sys.path.insert(0, str(project_root))
 
 # load environment variables from project root
-print(project_root / ".env")
+logger.info(project_root / ".env")
 load_dotenv(project_root / ".env")
 
 logger = logging.getLogger("discord_bot")
@@ -177,28 +178,34 @@ async def ask(ctx: SlashContext, question: str, private: bool = False):
                 )
         else:
             sent = await ctx.send(answer, components=fb_buttons(query_id))
-            logger.info("Sent message to channel: {}", sent)
+            logger.info(f"Sent message to channel: {sent}")
 
         # discord_message_id = getattr(sent, "id", None)
         RAG_TOTAL.inc()
         RAG_LATENCY.observe(latency / 1000.0)
 
-    except httpx.HTTPError:
+    except httpx.HTTPError as e:
         RAG_TOTAL.inc()
         RAG_FAILURES.inc()
         # fail latency also aggregate (meaningful)
         RAG_LATENCY.observe((time.perf_counter() - start) / 1000.0)
+        logger.error(f"HTTP error in /ask command: {e}")
         await ctx.send(
-            "Backend is not responding. Please try again later.",
+            "❌ **Service Unavailable**\n\n"
+            "The backend service is not responding. Please try again later.\n"
+            "If this problem persists, contact an administrator.",
             flags=MessageFlags.EPHEMERAL,
         )
 
-    except Exception:
+    except Exception as e:
         RAG_TOTAL.inc()
         RAG_FAILURES.inc()
         RAG_LATENCY.observe((time.perf_counter() - start) / 1000.0)
+        logger.error(f"Unexpected error in /ask command: {e}")
         await ctx.send(
-            "Sorry, I can't answer your question right now. Please try again later.",
+            "❌ **Query Error**\n\n"
+            "An unexpected error occurred while processing your question.\n"
+            "Please try again later or rephrase your question.",
             flags=MessageFlags.EPHEMERAL,
         )
 
@@ -221,17 +228,26 @@ async def on_feedback_btn(ctx: ComponentContext):
         )
         await ctx.send("Thank you for your feedback!", flags=MessageFlags.EPHEMERAL)
     except ValueError as e:
-        logger.warning("Invalid feedback button clicked: {}", e)
+        logger.warning(f"Invalid feedback button clicked: {e}")
         await ctx.send(
             "Invalid feedback button. Please try again.", flags=MessageFlags.EPHEMERAL
         )
-    except httpx.HTTPError:
+    except httpx.HTTPError as e:
+        logger.error(f"HTTP error in feedback processing: {e}")
         await ctx.send(
-            "Backend is not responding. Please try again later.",
+            "❌ **Feedback Error**\n\n"
+            "The backend service is not responding. Please try again later.\n"
+            "If this problem persists, contact an administrator.",
             flags=MessageFlags.EPHEMERAL,
         )
-    except Exception:
-        await ctx.send("Error processing feedback.", flags=MessageFlags.EPHEMERAL)
+    except Exception as e:
+        logger.error(f"Unexpected error in feedback processing: {e}")
+        await ctx.send(
+            "❌ **Feedback Error**\n\n"
+            "An unexpected error occurred while processing your feedback.\n"
+            "Please try again later.",
+            flags=MessageFlags.EPHEMERAL,
+        )
 
 
 @slash_command(
@@ -345,15 +361,21 @@ async def feedback_stats(ctx: SlashContext, days: int = 7):
             f"**Satisfaction Rate**: {summary.get('satisfaction_rate', 0):.1f}%",
         ]
         await ctx.send("\n".join(lines), flags=MessageFlags.EPHEMERAL)
-    except httpx.HTTPError:
+    except httpx.HTTPError as e:
+        logger.error(f"HTTP error getting feedback stats: {e}")
         await ctx.send(
-            "Backend is not responding. Please try again later.",
+            "❌ **Statistics Error**\n\n"
+            "The backend service is not responding. Please try again later.\n"
+            "If this problem persists, contact an administrator.",
             flags=MessageFlags.EPHEMERAL,
         )
     except Exception as e:
-        logger.error(f"Error getting feedback stats: {e}")
+        logger.error(f"Unexpected error getting feedback stats: {e}")
         await ctx.send(
-            "Error retrieving feedback statistics.", flags=MessageFlags.EPHEMERAL
+            "❌ **Statistics Error**\n\n"
+            "An unexpected error occurred while retrieving feedback statistics.\n"
+            "Please try again later.",
+            flags=MessageFlags.EPHEMERAL,
         )
 
 

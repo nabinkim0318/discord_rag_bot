@@ -14,7 +14,6 @@ from rag_agent.search.mmr import mmr_rerank
 ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT / ".env")
 
-
 try:
     from rag_agent.indexing.embeddings import embed_texts
 except ImportError:
@@ -41,8 +40,9 @@ except Exception:
 
     settings = _S()
 
-CLASS_NAME = "KBChunk"  # Match the class name created in C-step
-
+CLASS_NAME = os.getenv(
+    "WEAVIATE_CLASS_NAME", "KBChunk"
+)  # Match the class name created in indexing
 
 # ---------- Utils ----------
 # _min_max_norm function removed - using original scores for consistency with RRF
@@ -105,7 +105,7 @@ def vector_search_weaviate_by_query_vec(
             except Exception:
                 md = {}
 
-            # distance → similarity (standardized with vector.py)
+            # distance -> similarity (standardized with vector.py)
             add = it["_additional"] or {}
             # Use certainty if available (0~1), otherwise 1 - distance
             if "certainty" in add and add["certainty"] is not None:
@@ -273,7 +273,7 @@ def hybrid_retrieve_legacy(
     # Use original BM25 scores (smaller is better) - consistent with RRF approach
     # RRF is rank-based so score direction doesn't matter much
 
-    bm25_map = {}  # chunk_uid → (payload, score)
+    bm25_map = {}  # chunk_uid -> (payload, score)
     for h in bm25_hits:
         bm25_map[h["chunk_uid"]] = (
             {
@@ -332,7 +332,7 @@ def hybrid_retrieve_legacy(
         return []
 
     # --- 4) MMR reranking: diversity ---
-    # MMR needs similarity between documents → need candidate text embedding
+    # MMR needs similarity between documents -> need candidate text embedding
     cand_texts = [m["content"] for m in merged]
     cand_vecs = embed_texts(cand_texts)
 

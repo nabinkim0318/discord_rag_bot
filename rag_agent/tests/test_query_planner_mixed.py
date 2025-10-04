@@ -4,14 +4,12 @@
 
 # from rag_agent.query.query_planner import plan_query
 
-
 # # A tiny helper to fetch first intent object by name
 # def _find_intent(qp, name):
 #     for it in qp.intents:
 #         if it.intent == name:
 #             return it
 #     return None
-
 
 # # Assert helpers
 # def _assert_week(intent_obj, expected_week):
@@ -24,14 +22,12 @@
 #     else:
 #         assert intent_obj.extracted_info.get("week") == expected_week
 
-
 # def _assert_audience(intent_obj, expected_aud):
 #     if expected_aud is None:
 #         # audience may default to "all" for resources; that's OK
 #         pass
 #     else:
 #         assert intent_obj.extracted_info.get("audience") == expected_aud
-
 
 # CASES = [
 #     # 1
@@ -460,7 +456,6 @@
 #         "clarify": False,
 #     },
 # ]
-
 
 # @pytest.mark.parametrize("case", CASES, ids=[str(i + 1) for i in range(len(CASES))])
 # def test_mixed_intents(case):

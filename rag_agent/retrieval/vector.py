@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Dict, List, Optional
 
 from rag_agent.indexing.embeddings import embed_texts
@@ -16,7 +17,7 @@ try:
 except Exception:
     weaviate = None
 
-CLASS_NAME = "KBChunk"
+CLASS_NAME = os.getenv("WEAVIATE_CLASS_NAME", "KBChunk")
 
 
 def _client():

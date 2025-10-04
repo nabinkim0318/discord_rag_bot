@@ -2,7 +2,7 @@
 from time import perf_counter
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from sqlmodel import Session, select
 
 from app.core.logging import logger
@@ -115,8 +115,12 @@ async def query_rag(
             session.rollback()
         except Exception:
             pass  # Session might already be closed
-        raise HTTPException(
-            status_code=500, detail=f"Query processing failed: {str(e)}"
+        from app.core.exceptions import RAGException
+
+        raise RAGException(
+            message=f"Query processing failed: {str(e)}",
+            error_code="QUERY_PROCESSING_ERROR",
+            details={"stage": "query_processing", "endpoint": "/api/query/"},
         )
 
 

@@ -121,6 +121,25 @@ def upsert_chunks(
     return inserted_or_updated
 
 
+def _escape_fts5_query(query: str) -> str:
+    """
+    Escape FTS5 special characters to prevent query injection and syntax errors.
+
+    FTS5 special characters: " ' * ? ^ $ | \\ ( ) [ ] { } + - & | ! ~
+    """
+    import re
+
+    # Escape FTS5 special characters
+    special_chars = r'["\'*?^$|\\()\[\]{}+\-&|!~]'
+    escaped = re.sub(special_chars, r"\\\g<0>", query)
+
+    # Additional safety: remove any remaining problematic patterns
+    # Remove multiple consecutive spaces and normalize
+    escaped = re.sub(r"\s+", " ", escaped).strip()
+
+    return escaped
+
+
 def bm25_search(
     db_path: str,
     query: str,
@@ -131,7 +150,12 @@ def bm25_search(
     """
     BM25 search. chunks_fts → rowid to chunks Join.
     where: "source = '...'" additional filter condition (Optional)
+
+    Security: Query is escaped to prevent FTS5 injection attacks.
     """
+    # Escape the query to prevent FTS5 injection
+    escaped_query = _escape_fts5_query(query)
+
     sql = f"""
   SELECT c.doc_id, c.chunk_id, c.chunk_uid, c.text, c.title,
   c.section, c.page, c.source,
@@ -146,7 +170,7 @@ def bm25_search(
         # con.create_function(
         #     "bm25", 1, lambda x: x
         # )  # FTS5 builtin function alias safety
-        cur = con.execute(sql, (query, k))
+        cur = con.execute(sql, (escaped_query, k))
         out = []
         for row in cur.fetchall():
             out.append(

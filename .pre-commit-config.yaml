@@ -1,35 +1,88 @@
+# Pre-commit hooks configuration
+# 최적의 Python 코드 스타일 자동화 도구 조합
+
 repos:
-  # Python import organizer (isort) - must run before black
+  # 1. Import 정리 및 기본 포맷팅
   - repo: https://github.com/pycqa/isort
-    rev: 6.0.1
+    rev: 5.13.2
     hooks:
       - id: isort
-        args: ["--profile", "black"]
+        args: ["--profile", "black", "--line-length", "88"]
 
-  # Python formatter (Black)
-  - repo: https://github.com/psf/black
-    rev: 25.1.0
+  # 2. 빠르고 강력한 린터/포매터 (Ruff) - Black 대체
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.8
     hooks:
-      - id: black
-        language_version: python3
+      - id: ruff
+        args: ["--fix", "--line-length", "88"]
+      - id: ruff-format
 
-  # Python linter (Flake8)
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.3.0
-    hooks:
-      - id: flake8
-
-  # JSON / YAML organizer
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
-    hooks:
-      - id: check-yaml
-      - id: end-of-file-fixer
-      - id: trailing-whitespace
-
-  # Markdown Lint (document organizer - optional)
-  # Disabled due to Ruby version compatibility issues
-  # - repo: https://github.com/markdownlint/markdownlint
-  #   rev: v0.12.0
+  # 3. 기본 린팅 (Flake8) - Ruff와 중복이므로 비활성화
+  # - repo: https://github.com/pycqa/flake8
+  #   rev: 7.0.0
   #   hooks:
-  #     - id: markdownlint
+  #     - id: flake8
+  #       args: ["--max-line-length=88", "--extend-ignore=E203,W503"]
+
+  # 4. 보안 취약점 검사 (비활성화 - 환경 문제)
+  # - repo: https://github.com/PyCQA/bandit
+  #   rev: 1.7.5
+  #   hooks:
+  #     - id: bandit
+  #       args: ["-r", ".", "-f", "json", "-o", "bandit-report.json"]
+  #       exclude: ^tests/
+
+  # 5. 타입 체킹 (비활성화 - 환경 문제)
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: v1.8.0
+  #   hooks:
+  #     - id: mypy
+  #       additional_dependencies: [types-requests, types-PyYAML]
+  #       args: ["--ignore-missing-imports", "--no-strict-optional"]
+
+  # 6. 일반적인 파일 검사
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=1000"]
+
+  # 7. Docker 파일 검사
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        args: ["--ignore", "DL3008", "--ignore", "DL3009"]
+
+  # 8. Markdown 파일 검사 (완화된 설정)
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.37.0
+    hooks:
+      - id: markdownlint
+        args: ["--fix", "--config", ".markdownlint.json"]
+
+# Pre-commit 설정
+default_language_version:
+  python: python3.11
+
+# 파일별 설정
+default_stages: [commit, push]
+
+# 특정 파일 제외
+exclude: |
+  (?x)^(
+      \.git/.*|
+      \.venv/.*|
+      __pycache__/.*|
+      \.pytest_cache/.*|
+      htmlcov/.*|
+      \.coverage.*|
+      bandit-report\.json|
+      poetry\.lock
+  )$

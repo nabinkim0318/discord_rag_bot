@@ -233,7 +233,9 @@ def record_user_satisfaction(intent: str, satisfaction_score: float):
     satisfaction_level = (
         "high"
         if satisfaction_score > 4
-        else "medium" if satisfaction_score > 2 else "low"
+        else "medium"
+        if satisfaction_score > 2
+        else "low"
     )
     user_satisfaction_by_intent.labels(
         intent=intent, satisfaction_level=satisfaction_level
