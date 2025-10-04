@@ -41,6 +41,7 @@ jobs:
         run: |
           poetry run isort --check-only --profile black --line-length 88 .
           poetry run ruff check --line-length 88 .
+          poetry run ruff format .
           poetry run ruff format --check .
 
       - name: Run Tests (Backend)
@@ -80,6 +81,7 @@ jobs:
         run: |
           poetry run isort --check-only --profile black --line-length 88 .
           poetry run ruff check --line-length 88 .
+          poetry run ruff format .
           poetry run ruff format --check .
 
       - name: Run Tests (RAG Agent)
