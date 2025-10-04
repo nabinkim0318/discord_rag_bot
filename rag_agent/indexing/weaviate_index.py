@@ -30,9 +30,9 @@ try:
 except Exception:
     weaviate = None
 
-from rag_agent.core.logging import logger
-
 from app.core.config import settings  # Reuse backend settings
+
+from rag_agent.core.logging import logger
 
 CLASS_NAME = "KBChunk"  # Recommended class name (separate from RAGDocument)
 NAMESPACE = uuid.NAMESPACE_URL

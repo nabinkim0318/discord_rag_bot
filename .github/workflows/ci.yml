@@ -24,7 +24,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11"
 
       - name: Install Poetry
         uses: snok/install-poetry@v1
@@ -36,8 +36,11 @@ jobs:
       - name: Install dependencies (Backend)
         run: poetry install --no-interaction --no-ansi
 
-      - name: Run Pre-commit (Backend)
-        run: poetry run pre-commit run --all-files
+      - name: Run Linting (Backend)
+        run: |
+          poetry run isort --check-only --profile black --line-length 88 .
+          poetry run ruff check --line-length 88 .
+          poetry run ruff format --check .
 
       - name: Run Tests (Backend)
         run: poetry run pytest
@@ -59,7 +62,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11"
 
       - name: Install Poetry
         uses: snok/install-poetry@v1
@@ -71,8 +74,11 @@ jobs:
       - name: Install dependencies (RAG Agent)
         run: poetry install --no-interaction --no-ansi
 
-      - name: Run Pre-commit (RAG Agent)
-        run: poetry run pre-commit run --all-files
+      - name: Run Linting (RAG Agent)
+        run: |
+          poetry run isort --check-only --profile black --line-length 88 .
+          poetry run ruff check --line-length 88 .
+          poetry run ruff format --check .
 
       - name: Run Tests (RAG Agent)
         run: poetry run pytest
