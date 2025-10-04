@@ -241,7 +241,7 @@ if __name__ == "__main__":
         results = quick_search(query, k=k)
         print(f"Found {len(results)} results for query: '{query}'")
         for i, result in enumerate(results[:5]):  # Show top 5
-            print(f"{i+1}. {result.get('text', '')[:100]}...")
+            print(f"{i + 1}. {result.get('text', '')[:100]}...")
     except Exception as e:
         print(f"Error: {e}")
         sys.exit(1)
