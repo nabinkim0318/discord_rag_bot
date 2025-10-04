@@ -27,12 +27,14 @@ jobs:
           python-version: "3.12"
 
       - name: Install Poetry
-        uses: abatilo/actions-poetry@v3
+        uses: snok/install-poetry@v1
         with:
-          poetry-version: "2.0.0"
+          version: 1.8.3
+          virtualenvs-create: true
+          virtualenvs-in-project: true
 
       - name: Install dependencies (Backend)
-        run: poetry install --no-root
+        run: poetry install --no-interaction --no-ansi
 
       - name: Run Pre-commit (Backend)
         run: poetry run pre-commit run --all-files
@@ -60,12 +62,14 @@ jobs:
           python-version: "3.12"
 
       - name: Install Poetry
-        uses: abatilo/actions-poetry@v3
+        uses: snok/install-poetry@v1
         with:
-          poetry-version: "2.0.0"
+          version: 1.8.3
+          virtualenvs-create: true
+          virtualenvs-in-project: true
 
       - name: Install dependencies (RAG Agent)
-        run: poetry install --no-root
+        run: poetry install --no-interaction --no-ansi
 
       - name: Run Pre-commit (RAG Agent)
         run: poetry run pre-commit run --all-files
@@ -93,7 +97,7 @@ jobs:
           node-version: "20"
 
       - name: Install dependencies (Frontend)
-        run: npm install
+        run: npm ci
 
       - name: Run Prettier & Lint (Frontend)
         run: |
