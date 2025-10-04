@@ -53,7 +53,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --chown=raguser:raguser . .
 
 # Copy environment validation script
-COPY --chown=raguser:raguser ../backend/scripts/validate_env.py /usr/local/bin/validate_env.py
+COPY --chown=raguser:raguser backend/scripts/validate_env.py /usr/local/bin/validate_env.py
 RUN chmod +x /usr/local/bin/validate_env.py
 
 # Switch to non-root user

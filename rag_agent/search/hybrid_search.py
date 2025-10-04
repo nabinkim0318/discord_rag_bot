@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
+
 from rag_agent.indexing.sqlite_fts import bm25_search
 from rag_agent.search.mmr import mmr_rerank
 

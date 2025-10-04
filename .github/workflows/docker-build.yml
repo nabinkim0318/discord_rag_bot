@@ -30,7 +30,7 @@ jobs:
       - name: Build RAG agent Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./rag_agent
+          context: .
           file: ./rag_agent/Dockerfile
           push: false
           tags: discord-rag-agent:latest

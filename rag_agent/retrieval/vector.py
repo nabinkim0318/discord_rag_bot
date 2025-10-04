@@ -5,10 +5,10 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
-from rag_agent.indexing.embeddings import embed_texts
-
 from app.core.config import settings
 from app.core.metrics import record_failure_metric
+
+from rag_agent.indexing.embeddings import embed_texts
 
 log = logging.getLogger(__name__)
 
