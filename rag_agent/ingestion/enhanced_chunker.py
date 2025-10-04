@@ -68,7 +68,7 @@ class EnhancedChunker:
 
         # Link pattern
         self.link_patterns = [
-            r"\[([^\]]+)\]\(([^)]+)\)",  # Markdown 링크
+            r"\[([^\]]+)\]\(([^)]+)\)",  # Markdown link
             r"(https?://[^\s]+)",  # URL
             r"<([^|]+)\|([^>]+)>",  # <title|url> format
         ]
@@ -179,7 +179,7 @@ class EnhancedChunker:
         # Q&A pattern to split
         qa_patterns = [
             r"Q\s*:\s*(.+?)\s*A\s*:\s*(.+?)(?=Q\s*:|$)",
-            r"질문\s*:\s*(.+?)\s*답변\s*:\s*(.+?)(?=질문\s*:|$)",
+            r"질문\s*:\s*(.+?)\s*답변\s*:\s*(.+?)(?=질문\s*:|$)",  # Q&A pattern
             r"(.+?)\?\s*(.+?)(?=\n\n|\n[A-Z]|$)",
         ]
 
@@ -292,7 +292,7 @@ class EnhancedChunker:
 
     def _extract_week(self, content: str) -> Optional[int]:
         """Extract week information"""
-        patterns = [r"week\s*(\d+)", r"주차\s*(\d+)", r"(\d+)\s*주차"]
+        patterns = [r"week\s*(\d+)", r"주차\s*(\d+)", r"(\d+)\s*주차"]  # Week patterns
 
         for pattern in patterns:
             match = re.search(pattern, content.lower())
@@ -307,8 +307,8 @@ class EnhancedChunker:
     def _extract_topic(self, content: str) -> Optional[str]:
         """Extract topic (simple keyword based)"""
         topics = {
-            "pitch": ["pitch", "피치", "발표"],
-            "team": ["team", "팀", "매칭"],
+            "pitch": ["pitch", "피치", "발표"],  # Pitch keywords
+            "team": ["team", "팀", "매칭"],  # Team keywords
             "visa": ["visa", "비자", "opt", "cpt"],
             "training": ["training", "훈련", "트레이닝"],
             "schedule": ["schedule", "일정", "스케줄"],

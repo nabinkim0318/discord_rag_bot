@@ -128,7 +128,11 @@ def vector_search_weaviate_by_query_vec(
             )
         return out
     finally:
-        c.close()
+        try:
+            c.close()
+        except AttributeError:
+            # Weaviate client doesn't have close method in some versions
+            pass
 
 
 # ---------- Adapter for new retrieval pipeline ----------

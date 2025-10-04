@@ -40,7 +40,7 @@ services:
     env_file:
       - ./.env
     volumes:
-      - ./backend:/app # 전역 설치라 안전
+      - ./backend:/app # Safe for global installation
       - ./rag_agent:/app/rag_agent
     ports:
       - "8001:8001"

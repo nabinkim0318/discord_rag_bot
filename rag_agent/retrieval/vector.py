@@ -4,10 +4,10 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
+from rag_agent.indexing.embeddings import embed_texts
+
 from app.core.config import settings
 from app.core.metrics import record_failure_metric
-
-from rag_agent.indexing.embeddings import embed_texts
 
 log = logging.getLogger(__name__)
 
@@ -100,4 +100,8 @@ def vector_search(
         log.exception("weaviate vector query failed, %s", e)
         return []
     finally:
-        c.close()
+        try:
+            c.close()
+        except AttributeError:
+            # Weaviate client doesn't have close method in some versions
+            pass

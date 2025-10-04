@@ -161,9 +161,10 @@ def chunk_text(
     page: Optional[int] = None,
 ) -> List[Chunk]:
     """
-    문단 우선 → 필요 시 문장 합치기 → 윈도우(overlap)
-    - 각 청크 meta: chunk_id, start_char, end_char, section_path, doc_id, source, page
-    - 너무 짧으면 이웃과 병합, 너무 길면 안전 분할
+    Paragraph first → merge sentences if needed → window(overlap)
+    - Each chunk meta: chunk_id, start_char, end_char, section_path,
+    doc_id, source, page
+    - Merge with neighbors if too short, safe split if too long
     """
     base_meta = dict(base_meta or {})
     paras = _paragraph_spans(text) or [(0, len(text))]

@@ -1,5 +1,5 @@
 # rag_agent/generation/cli_generate.py
-# CLI에서 문장 생성 실행용 스크립트. python cli_generate.py --query "..."
+# Script for sentence generation from CLI. python cli_generate.py --query "..."
 # import argparse
 # import json
 # import os

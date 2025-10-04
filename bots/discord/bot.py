@@ -64,7 +64,7 @@ async def call_backend_query(
     async with httpx.AsyncClient(
         timeout=30.0, limits=limits, transport=httpx.AsyncHTTPTransport(retries=retry)
     ) as client:
-        # 향상된 RAG API 사용
+        # Use enhanced RAG API
         r = await client.post(
             f"{BACKEND_BASE}/api/v1/enhanced-rag/",
             json={"query": question, "top_k": top_k, "user_id": user_id},

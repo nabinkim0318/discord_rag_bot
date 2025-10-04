@@ -34,7 +34,7 @@
 # #         self.db_path = db_path
 # #         self.retrieval_kwargs = retrieval_kwargs
 
-# #         # LLM 클라이언트 (기존 구현 재사용)
+# #         # LLM client (reuse existing implementation)
 # #         self.llm_client = self._get_llm_client()
 
 # #     def run_enhanced_rag_pipeline(

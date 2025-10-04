@@ -5,10 +5,11 @@
 #   user_id TEXT NOT NULL,              -- Discord user id
 #   channel_id TEXT NOT NULL,           -- Discord channel id
 #   question TEXT NOT NULL,
-#   response TEXT,                      -- 최종 응답 텍스트
-#   discord_message_id TEXT,            -- 봇이 채널에 보낸 메시지 id (피드백 연결 시 유용)
-#   private BOOLEAN DEFAULT FALSE,      -- DM로 보냈는지 여부
-#   latency_ms INTEGER,                 -- RAG 왕복 시간
+#   response TEXT,                      -- Final response text
+#   discord_message_id TEXT,            -- Bot's message ID in channel
+# (useful for feedback connection)
+#   private BOOLEAN DEFAULT FALSE,      -- Whether sent via DM
+#   latency_ms INTEGER,                 -- RAG round-trip time
 #   status TEXT CHECK (status IN ('success','error')) DEFAULT 'success',
 #   error TEXT,
 #   created_at TIMESTAMP DEFAULT NOW()
@@ -30,10 +31,10 @@
 # CREATE INDEX IF NOT EXISTS idx_feedback_message_id
 #   ON feedback(message_id);
 
-# -- metrics_log (선택: 원시 로그용, 프로메테우스 지표와 병행)
+# -- metrics_log (optional: for raw logs, parallel with Prometheus metrics)
 # CREATE TABLE IF NOT EXISTS metrics_log (
 #   id UUID PRIMARY KEY,
-#   type TEXT,                            -- 'rag_query','health_check' 등
+#   type TEXT,                            -- 'rag_query','health_check' etc
 #   status TEXT,
 #   latency_seconds DOUBLE PRECISION,
 #   timestamp TIMESTAMP DEFAULT NOW()

@@ -66,7 +66,7 @@ def _dedup_key(s: str) -> str:
     s = s.lower()
     s = re.sub(r"[^a-z0-9\s]", " ", s)
     toks = [w for w in re.sub(r"\s+", " ", s).strip().split(" ") if w and w not in STOP]
-    return " ".join(toks[:40])  # 앞부분 40토큰까지만
+    return " ".join(toks[:40])  # Only first 40 tokens
 
 
 def _soft_trim(text: str, max_chars: int = 1200) -> str:

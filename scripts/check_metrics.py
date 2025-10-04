@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-간단한 metrics 확인 스크립트
+Simple metrics check script
 """
 from datetime import datetime
 
@@ -8,9 +8,9 @@ import requests
 
 
 def check_metrics():
-    """백엔드 API에서 metrics 확인"""
+    """Check metrics from backend API"""
     try:
-        # 백엔드 API health check
+        # Backend API health check
         health_response = requests.get("http://localhost:8001/health")
         print(f"🏥 Backend Health: {health_response.status_code}")
 
@@ -19,7 +19,7 @@ def check_metrics():
         if metrics_response.status_code == 200:
             print("📊 Metrics available at: http://localhost:8001/metrics")
 
-            # 간단한 metrics 파싱
+            # Simple metrics parsing
             metrics_text = metrics_response.text
             lines = metrics_text.split("\n")
 

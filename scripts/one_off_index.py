@@ -44,7 +44,7 @@ def main():
     stats = hybrid_index(
         sqlite_path=args.sqlite,
         chunks=[c.to_dict() for c in chunks],
-        embed_model=None,  # OPENAI_API_KEY 있으면 OpenAI, 없으면 pseudo
+        embed_model=None,  # Use OpenAI if OPENAI_API_KEY available, otherwise pseudo
         weaviate_enabled=not args.no_weaviate,
     )
     print("[index] stats:", stats)

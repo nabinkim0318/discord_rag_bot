@@ -88,7 +88,7 @@ def generate_answer(
     filters_fts: Optional[str] = None,
     filters_weaviate: Optional[Dict[str, Any]] = None,
 ):
-    # 실제 RAG 파이프라인 사용 (가능한 경우)
+    # Use actual RAG pipeline (if available)
     if RAG_AGENT_AVAILABLE:
         try:
             return rag_generate_answer(
@@ -122,7 +122,7 @@ def generate_answer(
                 filters_weaviate=filters_weaviate,
             )
     else:
-        # rag_agent가 사용 불가능한 경우 mock 사용
+        # Use mock if rag_agent is not available
         logger.warning("Using mock generate_answer - rag_agent not available")
         return generate_answer_mock(
             query,

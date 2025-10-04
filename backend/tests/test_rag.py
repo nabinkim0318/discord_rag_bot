@@ -11,7 +11,7 @@ def client():
 
 def test_query_rag_success(client):
     payload = {
-        "query": "Retrieval-Augmented Generation이 뭐야?",
+        "query": "What is Retrieval-Augmented Generation?",
         "top_k": 3,
         "use_streaming": False,
     }

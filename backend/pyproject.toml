@@ -15,7 +15,7 @@ loguru = "^0.7.2"
 requests = "^2.32.0"
 prometheus-client = "^0.22.1"
 prometheus-fastapi-instrumentator = "^7.1.0"
-# rag_agent = { path = "../rag_agent", develop = true }  # Docker 빌드 시 주석 처리
+# rag_agent = { path = "../rag_agent", develop = true }  # Commented out for Docker build
 sqlmodel = "^0.0.24"
 alembic = "^1.16.5"
 weaviate-client = "3.25.3"
