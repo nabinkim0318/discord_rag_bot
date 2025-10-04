@@ -1,42 +1,46 @@
-# app/models/feedback.py
+"""
+Feedback database models
+"""
+
 from datetime import datetime
-from enum import Enum
 from typing import Optional
-from uuid import uuid4
+from uuid import UUID, uuid4
 
-from pydantic import BaseModel
-from sqlmodel import Field, SQLModel, UniqueConstraint
-
-
-class FeedbackType(str, Enum):
-    up = "up"
-    down = "down"
+from sqlmodel import Field, SQLModel
 
 
-class Feedback(SQLModel, table=True):
+class FeedbackBase(SQLModel):
+    """Base feedback model"""
+
+    message_id: UUID = Field(
+        foreign_key="user_messages.id", description="Reference to user message"
+    )
+    user_id: str = Field(description="Discord user ID")
+    score: str = Field(description="Feedback score: 'up' or 'down'")
+    comment: Optional[str] = Field(default=None, description="Optional user comment")
+
+
+class Feedback(FeedbackBase, table=True):
+    """Feedback table model"""
+
     __tablename__ = "feedback"
-    __table_args__ = (
-        UniqueConstraint("query_id", "user_id", name="uq_feedback_query_user"),
+
+    id: UUID = Field(
+        default_factory=uuid4, primary_key=True, description="Unique feedback ID"
+    )
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow, description="Creation timestamp"
     )
 
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True, index=True)
-    query_id: str = Field(foreign_key="queries.id", index=True)
-    user_id: str = Field(index=True)
-    feedback: FeedbackType  # enum-backed column
-    comment: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class FeedbackCreate(FeedbackBase):
+    """Model for creating feedback"""
+
+    pass
 
 
-# request/response schema (already used form)
+class FeedbackRead(FeedbackBase):
+    """Model for reading feedback"""
 
-
-class FeedbackRequest(BaseModel):
-    query_id: str
-    feedback_type: FeedbackType  # API input is feedback_type
-    comment: Optional[str] = None
-
-
-class FeedbackResponse(BaseModel):
-    status: str
-    message: str
-    feedback_id: str
+    id: UUID
+    created_at: datetime

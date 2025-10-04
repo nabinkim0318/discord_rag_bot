@@ -85,8 +85,13 @@ async def call_backend_feedback(
         timeout=15.0, limits=limits, transport=httpx.AsyncHTTPTransport(retries=retry)
     ) as client:
         r = await client.post(
-            f"{BACKEND_BASE}/api/v1/feedback/",
-            json={"query_id": query_id, "feedback_type": score, "comment": comment},
+            f"{BACKEND_BASE}/api/v1/feedback/submit",
+            json={
+                "message_id": query_id,
+                "user_id": user_id,
+                "score": score,
+                "comment": comment,
+            },
             headers=headers,
         )
         r.raise_for_status()
@@ -307,6 +312,49 @@ async def get_backend_json(url: str, timeout: float = 10.0) -> dict:
         r = await client.get(url, headers={"User-Agent": "discord-rag-bot/1.0"})
         r.raise_for_status()
         return r.json()
+
+
+@slash_command(
+    name="feedback",
+    description="Get feedback statistics",
+    scopes=[GUILD_ID] if GUILD_ID else None,
+)
+@slash_option(
+    name="days",
+    description="Number of days to look back (default: 7)",
+    opt_type=OptionType.INTEGER,
+    required=False,
+    min_value=1,
+    max_value=365,
+)
+async def feedback_stats(ctx: SlashContext, days: int = 7):
+    """Get feedback statistics for the specified period"""
+    await ctx.defer(flags=MessageFlags.EPHEMERAL)
+    try:
+        summary = await get_backend_json(
+            f"{BACKEND_BASE}/api/v1/feedback/summary?days={days}"
+        )
+
+        lines = [
+            f"**Feedback Summary (Last {days} days)**",
+            f"**Total Feedback**: {summary.get('total_feedback', 0)}",
+            f"**👍 Up Votes**: {summary.get('up_votes', 0)}",
+            f"**👎 Down Votes**: {summary.get('down_votes', 0)}",
+            f"**Unique Users**: {summary.get('unique_users', 0)}",
+            f"**Unique Messages**: {summary.get('unique_messages', 0)}",
+            f"**Satisfaction Rate**: {summary.get('satisfaction_rate', 0):.1f}%",
+        ]
+        await ctx.send("\n".join(lines), flags=MessageFlags.EPHEMERAL)
+    except httpx.HTTPError:
+        await ctx.send(
+            "Backend is not responding. Please try again later.",
+            flags=MessageFlags.EPHEMERAL,
+        )
+    except Exception as e:
+        logger.error(f"Error getting feedback stats: {e}")
+        await ctx.send(
+            "Error retrieving feedback statistics.", flags=MessageFlags.EPHEMERAL
+        )
 
 
 @slash_command(
