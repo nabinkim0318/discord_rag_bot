@@ -19,13 +19,14 @@ import re
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.core.config import settings
-from app.core.logging import logger
-
 from rag_agent.core._bootstrap import attach_backend_path
 
 # Attach backend path
 attach_backend_path()
+
+# Import after path attachment
+from app.core.config import settings  # noqa: E402
+from app.core.logging import logger  # noqa: E402
 
 try:
     import tiktoken
