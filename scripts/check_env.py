@@ -4,12 +4,14 @@ Environment variables validation script
 Checks if all required environment variables are set
 """
 
+import logging
 import os
 import sys
 from pathlib import Path
 from typing import List, Tuple
 
-from rag_agent.core.logging import logger
+# Set up logger
+logger = logging.getLogger(__name__)
 
 # Required environment variables
 REQUIRED_VARS = {
@@ -156,35 +158,25 @@ def validate_values():
 def main():
     """Main validation function"""
     logger.info("🔍 Checking environment variables...")
-    logger.info()
+    print()
 
     # Check .env file
     if not check_env_file():
         sys.exit(1)
 
-    logger.info()
-
     # Check required variables
     required_ok, missing_required = check_required_vars()
     if not required_ok:
-        logger.info()
         logger.warning("❌ Please set the missing required environment variables")
         sys.exit(1)
-
-    logger.info()
 
     # Check recommended variables
     missing_recommended = check_recommended_vars()
 
-    logger.info()
-
     # Validate values
     if not validate_values():
-        logger.info()
         logger.warning("⚠️  Please fix the validation issues")
         sys.exit(1)
-
-    logger.info()
 
     # Service-specific checks
     services = ["discord", "backend", "weaviate"]
@@ -193,8 +185,6 @@ def main():
     for service in services:
         if not check_service_vars(service):
             all_services_ok = False
-
-    logger.info()
 
     if missing_recommended:
         logger.warning(

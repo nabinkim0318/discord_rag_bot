@@ -106,3 +106,5 @@ pnpm-debug.log*
 # ========================
 # Jest / SWC / Babel caches (safe to ignore if present)
 **/.cache/
+*.sqlite3-shm
+*.sqlite3-wal

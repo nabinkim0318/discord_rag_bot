@@ -5,6 +5,7 @@ Simple Metrics Dashboard (without Docker)
 from datetime import datetime
 
 import requests
+
 from rag_agent.core.logging import logger
 
 
@@ -48,7 +49,6 @@ def display_dashboard():
     logger.info("📊 RAG Bot Metrics Dashboard")
     logger.info("=" * 60)
     logger.info(f"🕐 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    logger.info()
 
     metrics_text = get_metrics()
     if not metrics_text:
@@ -75,8 +75,6 @@ def display_dashboard():
     else:
         logger.info("  📊 No RAG queries yet.")
 
-    logger.info()
-
     # Health metrics
     logger.info("🏥 Health Metrics:")
     health_metrics = {k: v for k, v in metrics.items() if "health_" in k}
@@ -90,8 +88,6 @@ def display_dashboard():
     else:
         logger.info("  📊 No health metrics")
 
-    logger.info()
-
     # Python metrics
     logger.info("🐍 Python Metrics:")
     python_metrics = {k: v for k, v in metrics.items() if "python_" in k}
@@ -102,7 +98,6 @@ def display_dashboard():
             else:
                 logger.info(f"  📊 {name}: {value}")
 
-    logger.info()
     logger.info("=" * 60)
     logger.info("💡 Tips:")
     logger.info("  - RAG queries update metrics")

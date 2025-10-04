@@ -81,8 +81,8 @@ services:
   # ==================== RAG Agent ====================
   rag_agent:
     build:
-      context: ./rag_agent
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./rag_agent/Dockerfile
     container_name: discord-rag-agent
     volumes:
       - ./rag_agent:/app

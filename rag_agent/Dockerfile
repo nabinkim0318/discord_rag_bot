@@ -56,15 +56,15 @@ COPY --chown=raguser:raguser rag_agent/ .
 COPY --chown=raguser:raguser backend/scripts/validate_env.py /usr/local/bin/validate_env.py
 RUN chmod +x /usr/local/bin/validate_env.py
 
+# Create startup script (before switching to non-root user)
+RUN printf '#!/bin/bash\nset -e\necho "🔍 Validating environment variables..."\npython /usr/local/bin/validate_env.py\necho "🛠️ Starting RAG agent (development mode)..."\nexec sleep infinity' > /app/start.sh && chmod +x /app/start.sh
+
 # Switch to non-root user
 USER raguser
 
 # Health check (process check)
 HEALTHCHECK --interval=60s --timeout=10s --start-period=10s --retries=3 \
     CMD pgrep -f "sleep infinity" || exit 1
-
-# Create startup script
-RUN printf '#!/bin/bash\nset -e\necho "🔍 Validating environment variables..."\npython /usr/local/bin/validate_env.py\necho "🛠️ Starting RAG agent (development mode)..."\nexec sleep infinity' > /app/start.sh && chmod +x /app/start.sh
 
 # Development mode - keep container alive
 CMD ["/app/start.sh"]
