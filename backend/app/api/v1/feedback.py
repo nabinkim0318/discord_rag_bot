@@ -16,7 +16,7 @@ feedback_router = APIRouter(prefix="/api/v1/feedback", tags=["feedback"])
 class FeedbackRequest(BaseModel):
     """Request model for submitting feedback"""
 
-    query_id: str = Field(alias="message_id")  # API 호환성을 위해 alias 사용
+    query_id: str = Field(alias="message_id")  # Using alias for API compatibility
     user_id: str
     score: str  # 'up' or 'down'
     comment: Optional[str] = None

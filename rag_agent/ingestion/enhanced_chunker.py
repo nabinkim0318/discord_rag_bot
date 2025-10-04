@@ -542,7 +542,7 @@ class EnhancedChunker:
         }
 
         # Extract words and normalize
-        words = re.findall(r"\b[a-zA-Z가-힣]+\b", content.lower())
+        words = re.findall(r"\b[a-zA-Z]+\b", content.lower())
         words = [w for w in words if w not in stop_words and len(w) > 2]
 
         # Calculate frequency
