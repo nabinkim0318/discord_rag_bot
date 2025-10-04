@@ -17,11 +17,11 @@ from dotenv import load_dotenv
 
 log = logging.getLogger(__name__)
 
-# ── .env: 레포 루트 한 번만 로드(다른 파일들과 일치)
+# ── .env: Load repo root only once (match other files)
 ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT / ".env")
 
-# OpenAI SDK 1.x 가용성 체크
+# OpenAI SDK 1.x availability check
 _OPENAI_READY = False
 try:
     from openai import OpenAI  # openai>=1.*
@@ -47,7 +47,7 @@ def _openai_client() -> Optional[OpenAI]:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         return None
-    base_url = os.getenv("OPENAI_BASE_URL") or None  # ✅ compatible endpoint 지원
+    base_url = os.getenv("OPENAI_BASE_URL") or None  # ✅ compatible endpoint support
     try:
         return OpenAI(api_key=api_key, base_url=base_url)
     except Exception as e:

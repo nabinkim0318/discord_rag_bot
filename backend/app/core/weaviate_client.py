@@ -25,7 +25,7 @@ class WeaviateClient:
     def _connect(self):
         """Connect to Weaviate using v3 client (stable)"""
         try:
-            # v3 클라이언트
+            # v3 client
             self.client = weaviate.Client(
                 url=settings.WEAVIATE_URL,
                 auth_client_secret=(

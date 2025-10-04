@@ -19,7 +19,7 @@ env_path = root_dir / ".env"
 if env_path.exists():
     load_dotenv(env_path)
 
-# backend 디렉토리를 Python 경로에 추가
+# Add backend directory to Python path
 backend_dir = Path(__file__).parent.parent.parent / "backend"
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))

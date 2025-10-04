@@ -21,7 +21,7 @@ def _rows_from_chunks(
 ) -> List[Dict[str, Any]]:
     """
     chunk object(dict) → SQLite input record standardization
-    기대 입력: {
+    Expected input: {
       'text': ..., 'meta': {doc_id, source, page, section_path, chunk_id, title? ...}
     }
     """

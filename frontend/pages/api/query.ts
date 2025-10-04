@@ -1,4 +1,4 @@
-// pages/api/query.ts (Next.js Pages Router용)
+// pages/api/query.ts (for Next.js Pages Router)
 import type { NextApiRequest, NextApiResponse } from "next";
 
 export default async function handler(

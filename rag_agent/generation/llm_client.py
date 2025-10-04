@@ -109,7 +109,7 @@ def llm_generate(
     max_tokens: Optional[int] = None,
     temperature: float = 0.2,
     stream: bool = False,
-    force_json: bool = False,  # ✅ v2.1 대비
+    force_json: bool = False,  # ✅ v2.1 compatibility
 ) -> str | Generator[str, None, None]:
 
     client, (kind, model) = _make_client()
@@ -125,7 +125,7 @@ def llm_generate(
         temperature=temperature,
         stream=stream,
     )
-    # OpenAI 일부 모델: response_format 지원
+    # Some OpenAI models support response_format
     if force_json and kind == "openai":
         kwargs["response_format"] = {"type": "json_object"}
 

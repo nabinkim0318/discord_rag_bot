@@ -4,103 +4,103 @@
 
 ### 1. Query Decomposition and Intent Detection System
 
-- [x] `rag_agent/query/query_planner.py` - 질의 계획 수립기
-- [x] 의도별 키워드 매핑 (schedule, faq, resources)
-- [x] 복합 질의 분할 로직
-- [x] 주차/날짜/대상자 정보 추출
-- [x] 명확화 필요성 검사
+- [x] `rag_agent/query/query_planner.py` - Query planning system
+- [x] Intent-based keyword mapping (schedule, faq, resources)
+- [x] Complex query decomposition logic
+- [x] Week/date/audience information extraction
+- [x] Clarification necessity check
 
-### 2. 문서 전처리 및 메타데이터 강화
+### 2. Document Preprocessing and Metadata Enhancement
 
-- [x] `rag_agent/ingestion/enhanced_chunker.py` - 향상된 청킹기
-- [x] 문서 타입 감지 (faq, schedule, process, resources)
-- [x] 헤딩 경계 기준 분할
-- [x] 메타데이터 추출 (doc_type, week, audience, links)
-- [x] 요약 및 키워드 자동 생성
+- [x] `rag_agent/ingestion/enhanced_chunker.py` - Enhanced chunker
+- [x] Document type detection (faq, schedule, process, resources)
+- [x] Heading boundary-based splitting
+- [x] Metadata extraction (doc_type, week, audience, links)
+- [x] Automatic summary and keyword generation
 
-### 3. 청킹 전략 개선
+### 3. Chunking Strategy Improvement
 
-- [x] FAQ 1문1답 단위 청킹
-- [x] 600토큰/130오버랩 기본 청킹
-- [x] 헤딩 경계 기준 분할
-- [x] 링크 추출 및 표준화
+- [x] FAQ Q&A unit chunking
+- [x] 600-token/130-overlap default chunking
+- [x] Heading boundary-based splitting
+- [x] Link extraction and standardization
 
-### 4. 하이브리드 검색 강화
+### 4. Hybrid Search Enhancement
 
-- [x] `rag_agent/retrieval/enhanced_retrieval.py` - 향상된 검색기
-- [x] 의도별 필터링 (doc_type, week, audience)
-- [x] 다중 라우팅 검색
-- [x] 재랭킹 및 중복 제거
-- [x] 섹션형 응답 조립
+- [x] `rag_agent/retrieval/enhanced_retrieval.py` - Enhanced retriever
+- [x] Intent-based filtering (doc_type, week, audience)
+- [x] Multi-routing search
+- [x] Re-ranking and deduplication
+- [x] Section-based response assembly
 
-### 5. Discord 최적화 프롬프트 v2.0
+### 5. Discord Optimized Prompt v2.0
 
-- [x] `rag_agent/generation/discord_prompt_builder.py` - Discord 프롬프트 빌더
-- [x] 섹션형 응답 구조
-- [x] 링크 표준화 (<제목|URL>)
-- [x] 불확실성 표기
-- [x] Discord UI 친화적 포맷팅
+- [x] `rag_agent/generation/discord_prompt_builder.py` - Discord prompt builder
+- [x] Section-based response structure
+- [x] Link standardization (<Title|URL>)
+- [x] Uncertainty notation
+- [x] Discord UI-friendly formatting
 
-### 6. 평가 데이터셋 확장
+### 6. Evaluation Dataset Expansion
 
-- [x] `rag_agent/data/enhanced_gold_eval.json` - 50문항 평가 데이터
-- [x] 일정형 질문 (15문항)
-- [x] 정책형 질문 (15문항)
-- [x] 리소스형 질문 (10문항)
-- [x] 복합 질문 (10문항)
+- [x] `rag_agent/data/enhanced_gold_eval.json` - 50-item evaluation data
+- [x] Schedule-type questions (15 items)
+- [x] Policy-type questions (15 items)
+- [x] Resource-type questions (10 items)
+- [x] Complex questions (10 items)
 
-### 7. 모니터링 및 관측성 강화
+### 7. Monitoring and Observability Enhancement
 
-- [x] `backend/app/core/enhanced_metrics.py` - 향상된 메트릭
-- [x] 의도별 검색 성능 메트릭
-- [x] 질의 분해 통계
-- [x] Discord 응답 품질 메트릭
-- [x] 사용자 상호작용 패턴
+- [x] `backend/app/core/enhanced_metrics.py` - Enhanced metrics
+- [x] Intent-based search performance metrics
+- [x] Query decomposition statistics
+- [x] Discord response quality metrics
+- [x] User interaction patterns
 
-### 8. API 및 서비스 통합
+### 8. API and Service Integration
 
-- [x] `backend/app/services/enhanced_rag_service.py` - 향상된 RAG 서비스
-- [x] `backend/app/api/v1/enhanced_rag.py` - API 엔드포인트
-- [x] Discord Bot 연동
-- [x] 메인 앱 라우터 등록
+- [x] `backend/app/services/enhanced_rag_service.py` - Enhanced RAG service
+- [x] `backend/app/api/v1/enhanced_rag.py` - API endpoint
+- [x] Discord Bot integration
+- [x] Main app router registration
 
-## 🔧 즉시 실행 가능한 명령어
+## 🔧 Ready-to-run Commands
 
-### 1. 시스템 실행
+### 1. System Execution
 
 ```bash
-# 전체 시스템 실행
+# Run entire system
 docker-compose up -d
 
-# 개별 서비스 실행
+# Run individual services
 cd backend && poetry run uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 cd bots && python run_bot.py
 ```
 
-### 2. 향상된 RAG API 테스트
+### 2. Enhanced RAG API Testing
 
 ```bash
-# 기본 RAG API
+# Basic RAG API
 curl -X POST "http://localhost:8001/api/v1/rag/" \
   -H "Content-Type: application/json" \
   -d '{"query": "Week 4 Pitch Day 언제야?", "top_k": 5}'
 
-# 향상된 RAG API
+# Enhanced RAG API
 curl -X POST "http://localhost:8001/api/v1/enhanced-rag/" \
   -H "Content-Type: application/json" \
   -d '{"query": "Week 4 Pitch Day 정확한 일정이랑 팀 매칭 폼 링크도 줘", "top_k": 5}'
 ```
 
-### 3. 평가 실행
+### 3. Evaluation Execution
 
 ```bash
-# 기존 평가 데이터
+# Existing evaluation data
 python -m rag_agent.evaluation.cli_eval --gold rag_agent/data/gold_eval.json
 
-# 향상된 평가 데이터 (50문항)
+# Enhanced evaluation data (50 items)
 python -m rag_agent.evaluation.cli_eval --gold rag_agent/data/enhanced_gold_eval.json
 
-# 커스텀 threshold 설정
+# Custom threshold settings
 python -m rag_agent.evaluation.cli_eval \
   --gold rag_agent/data/enhanced_gold_eval.json \
   --ndcg-threshold 0.7 \
@@ -108,71 +108,71 @@ python -m rag_agent.evaluation.cli_eval \
   --latency-threshold 2000.0
 ```
 
-### 4. Discord Bot 테스트
+### 4. Discord Bot Testing
 
 ```bash
-# Discord에서 슬래시 커맨드 사용
+# Use slash commands in Discord
 /ask Week 4 Pitch Day 언제야?
 /ask 팀 매칭 양식 링크 줘
 /ask 인턴십 유급인가요?
 /ask 엔지니어 훈련 자료 어디서 찾을 수 있어?
 
-# 시스템 상태 확인
+# Check system status
 /health
 /config
 /metrics
 ```
 
-## 📊 모니터링 및 메트릭
+## 📊 Monitoring and Metrics
 
-### 1. Prometheus 메트릭 확인
+### 1. Prometheus Metrics Check
 
 ```bash
-# 기본 메트릭
+# Basic metrics
 curl http://localhost:8001/metrics
 
-# 향상된 메트릭 (의도별)
+# Enhanced metrics (by intent)
 curl http://localhost:8001/metrics | grep "rag_enhanced"
 curl http://localhost:8001/metrics | grep "rag_intent"
 curl http://localhost:8001/metrics | grep "rag_discord"
 ```
 
-### 2. Grafana 대시보드
+### 2. Grafana Dashboard
 
 - URL: http://localhost:3000
-- 기본 대시보드: `simple-dashboard.json`
-- 향상된 메트릭 패널 추가 가능
+- Basic dashboard: `simple-dashboard.json`
+- Enhanced metrics panels can be added
 
-### 3. 로그 확인
+### 3. Log Check
 
 ```bash
-# 백엔드 로그
+# Backend logs
 docker logs discord-rag-api
 
-# Discord Bot 로그
+# Discord Bot logs
 docker logs discord-rag-bot
 
-# Weaviate 로그
+# Weaviate logs
 docker logs weaviate
 ```
 
-## 🎯 사용 사례별 테스트
+## 🎯 Use Case Testing
 
-### 1. 일정/마감/주차별 질문
+### 1. Schedule/Deadline/Week-based Questions
 
 ```bash
-# 단순 질문
+# Simple question
 curl -X POST "http://localhost:8001/api/v1/enhanced-rag/" \
   -H "Content-Type: application/json" \
   -d '{"query": "Week 4 Pitch Day 언제야?"}'
 
-# 복합 질문
+# Complex question
 curl -X POST "http://localhost:8001/api/v1/enhanced-rag/" \
   -H "Content-Type: application/json" \
   -d '{"query": "Week 4 Pitch Day 정확한 일정이랑 팀 매칭 폼 링크도 줘"}'
 ```
 
-### 2. 프로세스/정책형 FAQ
+### 2. process/policy FAQ
 
 ```bash
 curl -X POST "http://localhost:8001/api/v1/enhanced-rag/" \
@@ -184,7 +184,7 @@ curl -X POST "http://localhost:8001/api/v1/enhanced-rag/" \
   -d '{"query": "인턴십 유급인가요?"}'
 ```
 
-### 3. 학습자료/트레이닝 링크
+### 3. Learning Resources/Training Links
 
 ```bash
 curl -X POST "http://localhost:8001/api/v1/enhanced-rag/" \
@@ -196,15 +196,15 @@ curl -X POST "http://localhost:8001/api/v1/enhanced-rag/" \
   -d '{"query": "프롬프트 엔지니어링 코스 링크"}'
 ```
 
-## 🔍 디버깅 및 문제 해결
+## 🔍 Debugging and Troubleshooting
 
-### 1. 일반적인 문제
+### 1. Common Issues
 
 ```bash
-# 서비스 상태 확인
+# Check service status
 docker-compose ps
 
-# 로그 확인
+# Check logs
 docker-compose logs -f api
 docker-compose logs -f bot
 docker-compose logs -f weaviate
