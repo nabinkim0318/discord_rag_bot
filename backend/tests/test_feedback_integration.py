@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import httpx
+import pytest
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -21,6 +22,7 @@ load_dotenv(project_root / ".env")
 BACKEND_BASE = "http://localhost:8001"
 
 
+@pytest.mark.asyncio
 async def test_feedback_service():
     """Test feedback service endpoints"""
     print("🧪 Testing Feedback Service...")
