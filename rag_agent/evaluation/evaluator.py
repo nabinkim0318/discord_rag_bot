@@ -93,13 +93,44 @@ def run_evaluation(
 ) -> Tuple[List[CaseResult], EvalSummary]:
     os.makedirs(cfg.out_dir, exist_ok=True)
 
-    # load gold
+    # load gold with validation
     cases = []
+    skipped_count = 0
     with open(gold_path, "r", encoding="utf-8") as f:
-        for line in f:
+        for line_num, line in enumerate(f, 1):
             if not line.strip():
                 continue
-            cases.append(json.loads(line))
+            try:
+                case = json.loads(line)
+                # Validate required fields
+                if "qid" not in case:
+                    print(f"Warning: Skipping line {line_num} - missing 'qid' field")
+                    skipped_count += 1
+                    continue
+                if "question" not in case:
+                    print(
+                        f"Warning: Skipping line {line_num} - missing 'question' field"
+                    )
+                    skipped_count += 1
+                    continue
+                if "relevant_uids" not in case:
+                    print(
+                        f"Warning: Skipping line {line_num} - "
+                        "missing 'relevant_uids' field"
+                    )
+                    skipped_count += 1
+                    continue
+                cases.append(case)
+            except json.JSONDecodeError as e:
+                print(f"Warning: Skipping line {line_num} - invalid JSON: {e}")
+                skipped_count += 1
+                continue
+
+    if skipped_count > 0:
+        print(f"Warning: Skipped {skipped_count} invalid lines from gold data")
+
+    if not cases:
+        raise ValueError("No valid cases found in gold data")
 
     if cfg.max_cases:
         random.seed(42)
@@ -218,7 +249,11 @@ def dump_results(
 ) -> Dict[str, str]:
     Path(out_dir).mkdir(parents=True, exist_ok=True)
 
-    ts = time.strftime("%Y%m%d_%H%M%S")
+    # Use ISO-like timestamp format with timezone
+    from datetime import datetime, timezone
+
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%SZ")
+
     per_case_path = os.path.join(out_dir, f"cases_{ts}.jsonl")
     with open(per_case_path, "w", encoding="utf-8") as fo:
         for c in per_case:

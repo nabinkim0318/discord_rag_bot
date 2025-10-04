@@ -5,21 +5,24 @@ Feedback API endpoints
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.core.logging import logger
 from app.services.feedback_service import feedback_service
 
-router = APIRouter(prefix="/feedback", tags=["feedback"])
+feedback_router = APIRouter(prefix="/feedback", tags=["feedback"])
 
 
 class FeedbackRequest(BaseModel):
     """Request model for submitting feedback"""
 
-    message_id: str
+    query_id: str = Field(alias="message_id")  # API 호환성을 위해 alias 사용
     user_id: str
     score: str  # 'up' or 'down'
     comment: Optional[str] = None
+
+    class Config:
+        populate_by_name = True
 
 
 class FeedbackResponse(BaseModel):
@@ -41,7 +44,7 @@ class FeedbackHistoryResponse(BaseModel):
     """Response model for user feedback history"""
 
     id: str
-    message_id: str
+    query_id: str
     score: str
     comment: Optional[str]
     created_at: str
@@ -60,7 +63,7 @@ class FeedbackSummaryResponse(BaseModel):
     satisfaction_rate: float
 
 
-@router.post("/submit", response_model=FeedbackResponse)
+@feedback_router.post("/submit", response_model=FeedbackResponse)
 async def submit_feedback(feedback: FeedbackRequest):
     """
     Submit user feedback for a RAG response
@@ -74,7 +77,7 @@ async def submit_feedback(feedback: FeedbackRequest):
     """
     try:
         success, message = feedback_service.submit_feedback(
-            message_id=feedback.message_id,
+            query_id=feedback.query_id,
             user_id=feedback.user_id,
             score=feedback.score,
             comment=feedback.comment,
@@ -92,19 +95,19 @@ async def submit_feedback(feedback: FeedbackRequest):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/stats/{message_id}", response_model=FeedbackStatsResponse)
-async def get_feedback_stats(message_id: str):
+@feedback_router.get("/stats/{query_id}", response_model=FeedbackStatsResponse)
+async def get_feedback_stats(query_id: str):
     """
-    Get feedback statistics for a specific message
+    Get feedback statistics for a specific query
 
     Args:
-        message_id: UUID of the message
+        query_id: UUID of the query
 
     Returns:
         Feedback statistics (up/down counts)
     """
     try:
-        stats = feedback_service.get_feedback_stats(message_id)
+        stats = feedback_service.get_feedback_stats(query_id)
 
         return FeedbackStatsResponse(
             up=stats["up"], down=stats["down"], total=stats["up"] + stats["down"]
@@ -115,7 +118,7 @@ async def get_feedback_stats(message_id: str):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/history/{user_id}", response_model=List[FeedbackHistoryResponse])
+@feedback_router.get("/history/{user_id}", response_model=List[FeedbackHistoryResponse])
 async def get_user_feedback_history(
     user_id: str,
     limit: int = Query(
@@ -141,7 +144,7 @@ async def get_user_feedback_history(
         return [
             FeedbackHistoryResponse(
                 id=item["id"],
-                message_id=item["message_id"],
+                query_id=item["query_id"],
                 score=item["score"],
                 comment=item["comment"],
                 created_at=item["created_at"],
@@ -156,7 +159,7 @@ async def get_user_feedback_history(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/summary", response_model=FeedbackSummaryResponse)
+@feedback_router.get("/summary", response_model=FeedbackSummaryResponse)
 async def get_feedback_summary(
     days: int = Query(
         default=7, ge=1, le=365, description="Number of days to look back"
@@ -188,7 +191,7 @@ async def get_feedback_summary(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/health")
+@feedback_router.get("/health")
 async def health_check():
     """
     Health check endpoint for feedback service

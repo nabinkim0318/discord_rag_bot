@@ -64,9 +64,9 @@ async def call_backend_query(
     async with httpx.AsyncClient(
         timeout=30.0, limits=limits, transport=httpx.AsyncHTTPTransport(retries=retry)
     ) as client:
-        # Use enhanced RAG API
+        # Use query API that saves to database and returns query_id
         r = await client.post(
-            f"{BACKEND_BASE}/api/v1/enhanced-rag/",
+            f"{BACKEND_BASE}/api/query/",
             json={"query": question, "top_k": top_k, "user_id": user_id},
             headers=headers,
         )

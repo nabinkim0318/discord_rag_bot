@@ -19,15 +19,15 @@ from app.core.metrics import (
 )
 from app.db.session import get_session
 
-router = APIRouter()
+health_router = APIRouter()
 
 
-@router.get("/health")
+@health_router.get("/")
 def health():
     return {"status": "ok"}
 
 
-@router.get("/", tags=["Health"])
+@health_router.get("/check", tags=["Health"])
 async def health_check():
     start = perf_counter()
     try:
@@ -51,7 +51,7 @@ async def health_check():
         return {"status": "unhealthy", "error": str(e), "duration": duration}
 
 
-@router.get("/db", tags=["Health"])
+@health_router.get("/db", tags=["Health"])
 async def health_check_db(session: Session = Depends(get_session)):
     start = perf_counter()
     try:
@@ -68,7 +68,7 @@ async def health_check_db(session: Session = Depends(get_session)):
         return {"status": "database unhealthy", "error": str(e), "duration": duration}
 
 
-@router.get("/llm", tags=["Health"])
+@health_router.get("/llm", tags=["Health"])
 async def health_check_llm():
     start = perf_counter()
     try:
@@ -105,7 +105,7 @@ async def health_check_llm():
         return {"status": "llm unhealthy", "error": str(e), "duration": duration}
 
 
-@router.get("/vector-store", tags=["Health"])
+@health_router.get("/vector-store", tags=["Health"])
 async def health_check_vector_store():
     start = perf_counter()
     try:

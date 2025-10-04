@@ -1,7 +1,10 @@
 # rag_agent/evaluation/cli_eval.py
 import argparse
 import json
+import os
+import random
 import sys
+from datetime import datetime, timezone
 
 from rag_agent.evaluation.evaluator import (
     EvaluationConfig,
@@ -11,6 +14,9 @@ from rag_agent.evaluation.evaluator import (
 
 
 def main():
+    # Set random seed for reproducibility
+    random.seed(42)
+
     ap = argparse.ArgumentParser("RAG Evaluator")
     ap.add_argument("--gold", required=True, help="path to gold jsonl")
     ap.add_argument("--sqlite", default="rag_kb.sqlite3")
@@ -26,6 +32,10 @@ def main():
     ap.add_argument("--ndcg-threshold", type=float, default=0.6)
     ap.add_argument("--hit-rate-threshold", type=float, default=0.8)
     ap.add_argument("--latency-threshold", type=float, default=1000.0)
+    # additional options
+    ap.add_argument(
+        "--prometheus", action="store_true", help="generate Prometheus metrics file"
+    )
     args = ap.parse_args()
 
     cfg = EvaluationConfig(
@@ -45,6 +55,19 @@ def main():
 
     per_case, summary = run_evaluation(args.gold, cfg)
     paths = dump_results(per_case, summary, cfg.out_dir)
+
+    # Generate Prometheus metrics file if requested
+    if args.prometheus:
+        prom_path = os.path.join(cfg.out_dir, "evaluation_metrics.prom")
+        with open(prom_path, "w") as fo:
+            fo.write("# RAG Evaluation Metrics\n")
+            fo.write(f"# Generated at {datetime.now(timezone.utc).isoformat()}\n")
+            fo.write(f"rag_eval_total {summary.total}\n")
+            fo.write(f"rag_eval_ndcg_at_k {summary.ndcg_at_k_mean}\n")
+            fo.write(f"rag_eval_hit_rate {summary.hit_rate}\n")
+            fo.write(f"rag_eval_latency_ms {summary.latency_ms_mean}\n")
+            fo.write(f"rag_eval_passed {1 if summary.passed else 0}\n")
+        paths["prometheus"] = prom_path
 
     print("\n=== Evaluation Summary ===")
     print(json.dumps(summary.__dict__, indent=2))

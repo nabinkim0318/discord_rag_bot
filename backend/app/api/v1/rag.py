@@ -8,10 +8,10 @@ from app.services.rag_service import run_rag_pipeline
 
 # ==================== FastAPI Router ====================
 
-router = APIRouter(prefix="/api/v1/rag", tags=["RAG"])
+rag_router = APIRouter(prefix="/api/v1/rag", tags=["RAG"])
 
 
-@router.post("/", response_model=RAGQueryResponse)
+@rag_router.post("/", response_model=RAGQueryResponse)
 async def query_rag(request: RAGQueryRequest, http_request: Request):
     try:
         user_id = http_request.headers.get("X-User-ID")
