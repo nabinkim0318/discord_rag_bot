@@ -96,6 +96,7 @@ class TestHealthService:
             mock_settings.LLM_MODEL = "gpt-4o-mini"
 
             response = await health_check_llm()
+            # LLM check is currently mocked/disabled, so it should always return healthy
             assert response["status"] == "llm healthy"
             assert "duration" in response
             assert response["model"] == "gpt-4o-mini"

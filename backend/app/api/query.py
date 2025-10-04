@@ -95,7 +95,6 @@ async def query_rag(
             answer=answer,
             contexts=contexts,
             metadata=metadata,
-            query_id=str(query_record.id),  # Use actual DB query_id
         )
 
         dur = perf_counter() - start
