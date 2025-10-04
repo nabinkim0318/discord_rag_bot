@@ -1,9 +1,9 @@
 // frontend/pages/ChatPage.tsx
 import React, { useEffect, useRef, useState } from "react";
+import { useChat } from "../hooks/useChat";
 import ChatMessage from "./ChatMessage";
 import FeedbackButtons from "./FeedbackButtons";
 import LoadingMessage from "./LoadingMessage";
-import { useChat } from "./useChat";
 
 export default function ChatPage() {
   const { messages, loading, sendMessage, retryLast, error, setError } =

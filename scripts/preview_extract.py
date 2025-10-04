@@ -19,7 +19,6 @@ def preview(records, n=3, preview_chars=500):
         logger.info(f"section={m.section_title}  |  checksum={m.checksum[:10]}...")
         logger.info("-" * 80)
         logger.info(r.text[:preview_chars].strip())
-        logger.info()
 
 
 if __name__ == "__main__":

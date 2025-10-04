@@ -38,11 +38,11 @@ def generate_answer(
     sqlite_path = getattr(settings, "RAG_SQLITE_PATH", None)
     if not sqlite_path:
         db_url = getattr(settings, "DATABASE_URL", "rag_kb.sqlite3")
-        if db_url.startswith("sqlite:///"):
+        if db_url and db_url.startswith("sqlite:///"):
             # Extract file path from SQLite URL
             sqlite_path = db_url.replace("sqlite:///", "")
         else:
-            sqlite_path = db_url
+            sqlite_path = db_url or "rag_kb.sqlite3"
     # 1) search
     hits = hybrid_retrieve(
         query,
