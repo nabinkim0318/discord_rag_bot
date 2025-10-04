@@ -21,7 +21,7 @@ RUN poetry config virtualenvs.create false \
     && poetry config installer.parallel false
 
 # Copy dependency files
-COPY pyproject.toml poetry.lock* ./
+COPY rag_agent/pyproject.toml rag_agent/poetry.lock* ./
 
 # Install dependencies (production only)
 RUN poetry install --only=main --no-interaction --no-ansi --no-root
@@ -50,7 +50,7 @@ COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
-COPY --chown=raguser:raguser . .
+COPY --chown=raguser:raguser rag_agent/ .
 
 # Copy environment validation script
 COPY --chown=raguser:raguser backend/scripts/validate_env.py /usr/local/bin/validate_env.py

@@ -93,12 +93,12 @@ class TestHealthService:
             patch("app.api.v1.health.perf_counter", side_effect=[0, 0.1]),
         ):
             mock_settings.OPENAI_API_KEY = "mock_key"
-            mock_settings.LLM_MODEL = "gpt-mock"
+            mock_settings.LLM_MODEL = "gpt-4o-mini"
 
             response = await health_check_llm()
             assert response["status"] == "llm healthy"
             assert "duration" in response
-            assert response["model"] == "gpt-4o-mini"  # Actual model from settings
+            assert response["model"] == "gpt-4o-mini"
 
     @pytest.mark.asyncio
     async def test_health_check_llm_no_api_key(self):
