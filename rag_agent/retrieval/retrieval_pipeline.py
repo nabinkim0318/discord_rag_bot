@@ -9,12 +9,28 @@ from rag_agent.retrieval.fuse import mmr_select, rrf_combine
 from rag_agent.retrieval.keyword import bm25_search
 from rag_agent.retrieval.vector import vector_search
 
-from app.core.metrics import (
-    record_failure_metric,
-    record_rag_pipeline_latency,
-    record_retrieval_hit,
-    record_retriever_topk,
-)
+# Defensive import - prevent crashes when running without backend
+try:
+    from app.core.metrics import (
+        record_failure_metric,
+        record_rag_pipeline_latency,
+        record_retrieval_hit,
+        record_retriever_topk,
+    )
+except ImportError:
+    # Replace with dummy functions when running without backend
+    def record_failure_metric(*args, **kwargs):
+        pass
+
+    def record_rag_pipeline_latency(*args, **kwargs):
+        pass
+
+    def record_retrieval_hit(*args, **kwargs):
+        pass
+
+    def record_retriever_topk(*args, **kwargs):
+        pass
+
 
 log = logging.getLogger(__name__)
 
@@ -22,7 +38,7 @@ log = logging.getLogger(__name__)
 def _sqlite_where_from_filters(filters: Optional[Dict[str, Any]]) -> Optional[str]:
     """
     very simple where builder (extend if needed).
-    e.g. {"source": "Training.pdf"} → "source = 'Training.pdf'"
+    e.g. {"source": "Training.pdf"} -> "source = 'Training.pdf'"
     """
     if not filters:
         return None
@@ -79,7 +95,7 @@ def search_hybrid(
     """
     1) BM25 k, Vector k search
     2) RRF combine
-    3) MMR diversity correction → top_k_final
+    3) MMR diversity correction -> top_k_final
     4) LLM-ready format
     """
     t0 = time.time()

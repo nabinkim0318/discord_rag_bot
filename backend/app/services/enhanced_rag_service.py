@@ -1,31 +1,34 @@
-# # backend/app/services/enhanced_rag_service.py
-# """
-# Enhanced RAG service
-# - Query decomposition and intent detection
-# - Multi-route search
-# - Discord-optimized response generation
-# """
+# backend/app/services/enhanced_rag_service.py
+"""
+Enhanced RAG service
+- Query decomposition and intent detection
+- Multi-route search
+- Discord-optimized response generation
+"""
 
-# import time
-# from typing import Any, Dict, List, Optional, Tuple
+import time
+from typing import Any, Dict, List, Optional, Tuple
 
-# from rag_agent.generation.discord_prompt_builder import (
-#     build_discord_prompt,
-#     format_discord_response,
-#     parse_discord_response,
-# )
+from app.core.logging import logger
+from app.core.metrics import (
+    record_failure_metric,
+    record_rag_pipeline_latency,
+    record_rag_request,
+    record_retrieval_hit,
+    record_retriever_topk,
+)
 
-# # RAG Agent imports
-# from rag_agent.query.query_planner import plan_query
-# from rag_agent.retrieval.enhanced_retrieval import enhanced_retrieve
+# Import actual RAG pipeline from rag_agent
+try:
+    from rag_agent.generation.generation_pipeline import (
+        generate_answer as rag_generate_answer,
+    )
 
-# from app.core.logging import logger
-# from app.core.metrics import (
-#     record_failure_metric,
-#     record_rag_pipeline_latency,
-#     record_retrieval_hit,
-#     record_retriever_topk,
-# )
+    RAG_AGENT_AVAILABLE = True
+    logger.info("Enhanced RAG: Using actual RAG pipeline")
+except ImportError as e:
+    logger.warning(f"Enhanced RAG: rag_agent not available: {e}")
+    RAG_AGENT_AVAILABLE = False
 
 # # class EnhancedRAGService:
 # #     """Enhanced RAG service"""
@@ -251,10 +254,8 @@
 # #         except Exception as e:
 # #             logger.exception(f"Metrics recording failed: {e}")
 
-
 # # # Global instance
 # # enhanced_rag_service = None
-
 
 # # def get_enhanced_rag_service(**kwargs) -> EnhancedRAGService:
 # #     """Return enhanced RAG service instance"""
@@ -264,9 +265,157 @@
 # #     return enhanced_rag_service
 
 
-# # def run_enhanced_rag_pipeline(
-# #     query: str, top_k: int = 5, **kwargs
-# # ) -> Tuple[str, List[Dict], Dict[str, Any]]:
-# #     """Run enhanced RAG pipeline (convenience function)"""
-# #     service = get_enhanced_rag_service()
-# #     return service.run_enhanced_rag_pipeline(query, top_k, **kwargs)
+def run_enhanced_rag_pipeline(
+    query: str,
+    top_k: int = 5,
+    *,
+    user_id: Optional[str] = None,
+    channel_id: Optional[str] = None,
+    request_id: Optional[str] = None,
+) -> Tuple[str, List[Dict], Dict[str, Any]]:
+    """
+    Run enhanced RAG pipeline using actual RAG agent
+
+    Args:
+        query: User query
+        top_k: Number of documents to retrieve
+        user_id: User ID for tracking
+        channel_id: Channel ID for context
+        request_id: Request ID for tracking
+
+    Returns:
+        Tuple of (answer, contexts, metadata)
+    """
+    start_time = time.time()
+
+    try:
+        logger.info(f"Enhanced RAG: Processing query: {query[:100]}...")
+
+        # Record request metric
+        record_rag_request("/api/v1/enhanced-rag/")
+
+        if RAG_AGENT_AVAILABLE:
+            try:
+                # Use actual RAG pipeline
+                answer, contexts, metadata = rag_generate_answer(
+                    query=query,
+                    k_final=top_k,
+                    k_bm25=30,
+                    k_vec=30,
+                    bm25_weight=0.4,
+                    vec_weight=0.6,
+                    mmr_lambda=0.65,
+                    reranker=None,
+                    prompt_version="v1.1",
+                    stream=False,
+                )
+
+                # Add enhanced metadata
+                total_time = time.time() - start_time
+                enhanced_metadata = {
+                    **metadata,
+                    "total_time": total_time,
+                    "retrieval_time": metadata.get("retrieval", {}).get(
+                        "retrieval_time", 0
+                    ),
+                    "generation_time": total_time
+                    - metadata.get("retrieval", {}).get("retrieval_time", 0),
+                    "user_id": user_id,
+                    "channel_id": channel_id,
+                    "request_id": request_id,
+                    "enhanced_rag": True,
+                }
+
+                # Format contexts for API response
+                formatted_contexts = []
+                for ctx in contexts:
+                    formatted_contexts.append(
+                        {
+                            "chunk_uid": ctx.get("chunk_uid", ""),
+                            "content": ctx.get("text", ctx.get("content", "")),
+                            "source": ctx.get("source", ""),
+                            "score": ctx.get("score", 0.0),
+                            "metadata": ctx.get("metadata", {}),
+                        }
+                    )
+
+                # Record metrics
+                record_rag_pipeline_latency(total_time)
+                record_retrieval_hit(len(contexts) > 0)
+                record_retriever_topk(top_k)
+
+                logger.info(f"Enhanced RAG: Completed in {total_time:.3f}s")
+                return answer, formatted_contexts, enhanced_metadata
+
+            except Exception as e:
+                logger.warning(
+                    f"Enhanced RAG: RAG agent failed, falling back to mock: {e}"
+                )
+                # Fallback to mock implementation
+                return _mock_enhanced_rag_pipeline(
+                    query, top_k, user_id, channel_id, request_id
+                )
+
+        else:
+            # Fallback to mock implementation
+            logger.warning("Enhanced RAG: Using mock implementation")
+            return _mock_enhanced_rag_pipeline(
+                query, top_k, user_id, channel_id, request_id
+            )
+
+    except Exception as e:
+        logger.exception(f"Enhanced RAG pipeline failed: {e}")
+        record_failure_metric("/api/v1/enhanced-rag/", "pipeline_error")
+        raise
+
+
+def _mock_enhanced_rag_pipeline(
+    query: str,
+    top_k: int = 5,
+    user_id: Optional[str] = None,
+    channel_id: Optional[str] = None,
+    request_id: Optional[str] = None,
+) -> Tuple[str, List[Dict], Dict[str, Any]]:
+    """Mock implementation for when RAG agent is not available"""
+
+    # Mock response
+    answer = "🤖 **Enhanced RAG Response**\n\n"
+    answer += f"Query: {query}\n\n"
+    answer += "This is a mock response from the Enhanced RAG pipeline. "
+    answer += (
+        "The actual RAG agent is not available, so this is a placeholder response."
+    )
+
+    # Mock contexts
+    contexts = [
+        {
+            "chunk_uid": "mock-chunk-1",
+            "content": f"Mock context 1 for query: {query[:50]}...",
+            "source": "mock_document.pdf",
+            "score": 0.95,
+            "metadata": {"page": 1, "section": "introduction"},
+        },
+        {
+            "chunk_uid": "mock-chunk-2",
+            "content": f"Mock context 2 for query: {query[:50]}...",
+            "source": "mock_document.pdf",
+            "score": 0.87,
+            "metadata": {"page": 2, "section": "details"},
+        },
+    ]
+
+    # Mock metadata
+    metadata = {
+        "total_time": 0.1,
+        "retrieval_time": 0.05,
+        "generation_time": 0.05,
+        "user_id": user_id,
+        "channel_id": channel_id,
+        "request_id": request_id,
+        "enhanced_rag": True,
+        "mock": True,
+        "query": query,
+        "top_k": top_k,
+    }
+
+    return answer, contexts, metadata

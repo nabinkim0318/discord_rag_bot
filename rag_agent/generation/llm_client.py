@@ -58,7 +58,7 @@ def _make_client() -> Tuple[object, Tuple[str, str]]:
     """
     Return: (client, (kind, model_or_deployment))
       - kind: "azure" | "openai"
-    Priority: Azure OpenAI → OpenAI/compatible
+    Priority: Azure OpenAI -> OpenAI/compatible
     """
     # Azure OpenAI priority
     if (
@@ -98,9 +98,8 @@ def llm_generate(
     max_tokens: Optional[int] = None,
     temperature: float = 0.2,
     stream: bool = False,
-    force_json: bool = False,  # ✅ v2.1 compatibility
+    force_json: bool = False,  # v2.1 compatibility
 ) -> str | Generator[str, None, None]:
-
     client, (kind, model) = _make_client()
     max_tokens = max_tokens or int(os.getenv("LLM_MAX_TOKENS", "600"))
 

@@ -6,6 +6,7 @@ import random
 import sys
 from datetime import datetime, timezone
 
+from rag_agent.core.logging import logger
 from rag_agent.evaluation.evaluator import (
     EvaluationConfig,
     dump_results,
@@ -69,18 +70,18 @@ def main():
             fo.write(f"rag_eval_passed {1 if summary.passed else 0}\n")
         paths["prometheus"] = prom_path
 
-    print("\n=== Evaluation Summary ===")
-    print(json.dumps(summary.__dict__, indent=2))
-    print("\nArtifacts:")
+    logger.info("\n=== Evaluation Summary ===")
+    logger.info(json.dumps(summary.__dict__, indent=2))
+    logger.info("\nArtifacts:")
     for k, v in paths.items():
-        print(f"- {k}: {v}")
+        logger.info(f"- {k}: {v}")
 
     # Use the new threshold-based pass/fail logic
     if not summary.passed:
-        print(f"\n❌ Evaluation FAILED: {summary.failure_reason}")
+        logger.warning(f"\n❌ Evaluation FAILED: {summary.failure_reason}")
         sys.exit(1)
     else:
-        print("\n✅ Evaluation PASSED")
+        logger.info("\n✅ Evaluation PASSED")
         sys.exit(0)
 
 

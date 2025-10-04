@@ -4,7 +4,6 @@
 
 # client = TestClient(app)
 
-
 # def test_submit_feedback_success():
 #     payload = {
 #         "query": "What is RAG?",

@@ -1,6 +1,6 @@
 # app/api/v1/rag.py
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 
 from app.core.metrics import record_failure_metric
 from app.models.rag import RAGQueryRequest, RAGQueryResponse
@@ -32,4 +32,10 @@ async def query_rag(request: RAGQueryRequest, http_request: Request):
         }
     except Exception as e:
         record_failure_metric("/api/v1/rag/", "pipeline_error")
-        raise HTTPException(status_code=500, detail=str(e))
+        from app.core.exceptions import RAGException
+
+        raise RAGException(
+            message=f"RAG pipeline failed: {str(e)}",
+            error_code="RAG_PIPELINE_ERROR",
+            details={"stage": "generation", "endpoint": "/api/v1/rag/"},
+        )

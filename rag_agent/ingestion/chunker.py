@@ -15,9 +15,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 log = logging.getLogger(__name__)
 
-
 # --- sentence tokenizer: use spaCy if available, use NLTK if
 # available, use regex fallback ---
+
+# Global spaCy model cache to avoid repeated loading
+_NLP = None
+
+
 def _sent_tokenize(text: str) -> List[Tuple[int, int]]:
     """
     Return list of (start_char, end_char) spans for sentences.
@@ -25,8 +29,13 @@ def _sent_tokenize(text: str) -> List[Tuple[int, int]]:
     try:
         import spacy
 
-        nlp = spacy.load("en_core_web_sm")
-        doc = nlp(text)
+        global _NLP
+
+        # Load model only once and cache it
+        if _NLP is None:
+            _NLP = spacy.load("en_core_web_sm", disable=["tagger", "ner", "lemmatizer"])
+
+        doc = _NLP(text)
         return [(s.start_char, s.end_char) for s in doc.sents]
     except Exception:
         try:
@@ -81,9 +90,17 @@ def _split_long(text: str, s: int, e: int, max_chars: int) -> List[Tuple[int, in
     while i < e:
         j = min(i + max_chars, e)
         if j < e:
-            # search backward for whitespace
-            m = re.search(r"\s", text[i:j][::-1])
-            cut = j if not m else j - m.start()
+            # search backward for whitespace with proper reverse index handling
+            rev = text[i:j][::-1]
+            m = re.search(r"\s", rev)
+            if m:
+                # Fix: Proper reverse index calculation with safety bounds
+                cut = max(i + 1, j - m.start() - 1)  # Ensure progress
+            else:
+                cut = j
+            # Safety check to prevent infinite loop
+            if cut <= i:
+                cut = min(j, i + max_chars)
             spans.append((i, cut))
             i = cut
         else:
@@ -109,6 +126,10 @@ def _paragraph_spans(text: str) -> List[Tuple[int, int]]:
 def _build_windows(
     unit_spans: List[Tuple[int, int]], max_chars: int, overlap: int
 ) -> List[Tuple[int, int]]:
+    # Fix: Handle empty input
+    if not unit_spans:
+        return []
+
     out = []
     cur_s = unit_spans[0][0]
     cur_e = cur_s
@@ -161,7 +182,7 @@ def chunk_text(
     page: Optional[int] = None,
 ) -> List[Chunk]:
     """
-    Paragraph first → merge sentences if needed → window(overlap)
+    Paragraph first -> merge sentences if needed -> window(overlap)
     - Each chunk meta: chunk_id, start_char, end_char, section_path,
     doc_id, source, page
     - Merge with neighbors if too short, safe split if too long
@@ -175,9 +196,8 @@ def chunk_text(
             merged.append((s, e))
             continue
         # split into sentences and merge short sentences
-        sent_spans = [
-            (max(s, ss), min(e, ee)) for (ss, ee) in _sent_tokenize(text[s:e])
-        ]
+        # Fix: Convert slice-based offsets to original text offsets
+        sent_spans = [(s + ss, s + ee) for (ss, ee) in _sent_tokenize(text[s:e])]
         if not sent_spans:
             merged.append((s, e))
             continue
@@ -232,6 +252,108 @@ def chunk_text(
         )
 
     return chunks
+
+
+def validate_chunk_data(chunks: List[Chunk], original_text: str) -> Dict[str, Any]:
+    """
+    Validate chunk data integrity and statistics
+
+    Args:
+        chunks: List of chunks to validate
+        original_text: Original text for offset validation
+
+    Returns:
+        Dict with validation results and statistics
+    """
+    validation_results = {
+        "offset_integrity_passed": True,
+        "id_stability_passed": True,
+        "length_stats": {},
+        "integration_check_passed": True,
+        "errors": [],
+    }
+
+    # 1. Offset integrity check
+    for i, chunk in enumerate(chunks):
+        start_char = chunk.meta.get("start_char", 0)
+        end_char = chunk.meta.get("end_char", len(chunk.text))
+
+        try:
+            original_slice = original_text[start_char:end_char]
+            assert (
+                chunk.text.strip() == original_slice.strip()
+            ), f"Chunk {i}: text mismatch at offset {start_char}:{end_char}"
+        except (AssertionError, IndexError) as e:
+            validation_results["offset_integrity_passed"] = False
+            validation_results["errors"].append(
+                f"Offset integrity error in chunk {i}: {str(e)}"
+            )
+
+    # 2. Length statistics
+    chunk_lengths = [len(chunk.text) for chunk in chunks]
+    if chunk_lengths:
+        sorted_lengths = sorted(chunk_lengths)
+        n = len(sorted_lengths)
+        p10 = sorted_lengths[max(0, int(0.10 * n) - 1)]
+        p90 = sorted_lengths[min(n - 1, int(0.90 * n) - 1)]
+        mean_length = sum(chunk_lengths) / len(chunk_lengths)
+        min_length = min(chunk_lengths)
+        max_length = max(chunk_lengths)
+
+        validation_results["length_stats"] = {
+            "count": len(chunk_lengths),
+            "mean": mean_length,
+            "p10": p10,
+            "p90": p90,
+            "min": min_length,
+            "max": max_length,
+            "p10_p90_in_range": 300 <= p10 and p90 <= 1000,
+        }
+
+        # Check if p10/p90 are in expected range (300-1000 chars)
+        if not (300 <= p10 and p90 <= 1000):
+            validation_results["errors"].append(
+                f"Length stats out of range: p10={p10}, p90={p90}"
+            )
+
+    # 3. Integration check - verify required fields for hybrid indexer
+    required_fields = ["doc_id", "chunk_id", "source", "page", "section_path"]
+    for i, chunk in enumerate(chunks):
+        missing_fields = [field for field in required_fields if field not in chunk.meta]
+        if missing_fields:
+            validation_results["integration_check_passed"] = False
+            validation_results["errors"].append(
+                f"Chunk {i} missing required fields: {missing_fields}"
+            )
+
+    return validation_results
+
+
+def test_id_stability(chunker_func, text: str, **kwargs) -> bool:
+    """
+    Test ID stability by running chunker twice and comparing chunk_uid sets
+
+    Args:
+        chunker_func: Chunking function to test
+        text: Input text
+        **kwargs: Additional arguments for chunker
+
+    Returns:
+        bool: True if IDs are stable, False otherwise
+    """
+    # Run chunker twice
+    chunks1 = chunker_func(text, **kwargs)
+    chunks2 = chunker_func(text, **kwargs)
+
+    # Extract chunk_uid sets
+    uids1 = {
+        chunk.meta.get("chunk_uid", chunk.meta.get("chunk_id", "")) for chunk in chunks1
+    }
+    uids2 = {
+        chunk.meta.get("chunk_uid", chunk.meta.get("chunk_id", "")) for chunk in chunks2
+    }
+
+    return uids1 == uids2
 
 
 # chunks = chunk_text(

@@ -29,6 +29,8 @@ try:
 except Exception:
     weaviate = None
 
+from rag_agent.core.logging import logger
+
 from app.core.config import settings  # Reuse backend settings
 
 CLASS_NAME = "KBChunk"  # Recommended class name (separate from RAGDocument)
@@ -127,7 +129,7 @@ def safe_upsert_single_chunk(
         )
         return True
     except Exception as e:
-        print(f"Safe upsert failed for chunk_uid {cu}: {e}")
+        logger.warning(f"Safe upsert failed for chunk_uid {cu}: {e}")
         return False
     finally:
         c.close()
@@ -147,7 +149,7 @@ def delete_chunks_by_doc_id(doc_id: str) -> int:
         # return deleted object count
         return result.get("results", {}).get("successful", 0)
     except Exception as e:
-        print(f"Delete by doc_id failed for {doc_id}: {e}")
+        logger.warning(f"Delete by doc_id failed for {doc_id}: {e}")
         return 0
     finally:
         c.close()
@@ -251,7 +253,7 @@ def bulk_upsert_by_doc_id(
     for doc_id, doc_items in doc_groups.items():
         # 1. delete all existing chunks for the doc_id
         deleted_count = delete_chunks_by_doc_id(doc_id)
-        print(f"Deleted {deleted_count} existing chunks for doc_id: {doc_id}")
+        logger.info(f"Deleted {deleted_count} existing chunks for doc_id: {doc_id}")
 
         # 2. batch insert new chunks
         c = _client()

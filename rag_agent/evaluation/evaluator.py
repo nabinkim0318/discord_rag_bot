@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from rag_agent.core.logging import logger
 from rag_agent.evaluation.metrics import (
     ap_at_k,
     mrr_at_k,
@@ -104,17 +105,19 @@ def run_evaluation(
                 case = json.loads(line)
                 # Validate required fields
                 if "qid" not in case:
-                    print(f"Warning: Skipping line {line_num} - missing 'qid' field")
+                    logger.warning(
+                        f"Warning: Skipping line {line_num} - missing 'qid' field"
+                    )
                     skipped_count += 1
                     continue
                 if "question" not in case:
-                    print(
+                    logger.warning(
                         f"Warning: Skipping line {line_num} - missing 'question' field"
                     )
                     skipped_count += 1
                     continue
                 if "relevant_uids" not in case:
-                    print(
+                    logger.warning(
                         f"Warning: Skipping line {line_num} - "
                         "missing 'relevant_uids' field"
                     )
@@ -122,12 +125,12 @@ def run_evaluation(
                     continue
                 cases.append(case)
             except json.JSONDecodeError as e:
-                print(f"Warning: Skipping line {line_num} - invalid JSON: {e}")
+                logger.warning(f"Warning: Skipping line {line_num} - invalid JSON: {e}")
                 skipped_count += 1
                 continue
 
     if skipped_count > 0:
-        print(f"Warning: Skipped {skipped_count} invalid lines from gold data")
+        logger.warning(f"Warning: Skipped {skipped_count} invalid lines from gold data")
 
     if not cases:
         raise ValueError("No valid cases found in gold data")

@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from app.core.logging import logger
 from app.services.feedback_service import feedback_service
 
-feedback_router = APIRouter(prefix="/feedback", tags=["feedback"])
+feedback_router = APIRouter(prefix="/api/v1/feedback", tags=["feedback"])
 
 
 class FeedbackRequest(BaseModel):
@@ -92,7 +92,13 @@ async def submit_feedback(feedback: FeedbackRequest):
         raise
     except Exception as e:
         logger.error(f"Unexpected error in submit_feedback: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        from app.core.exceptions import DatabaseException
+
+        raise DatabaseException(
+            message=f"Feedback submission failed: {str(e)}",
+            error_code="FEEDBACK_SUBMISSION_ERROR",
+            details={"service": "feedback_service"},
+        )
 
 
 @feedback_router.get("/stats/{query_id}", response_model=FeedbackStatsResponse)
@@ -163,7 +169,7 @@ async def get_user_feedback_history(
 async def get_feedback_summary(
     days: int = Query(
         default=7, ge=1, le=365, description="Number of days to look back"
-    )
+    ),
 ):
     """
     Get feedback summary statistics

@@ -1,0 +1,3 @@
+{"query": "When are office hours?", "must_have": ["office hours", "time"], "gold_snippets": ["Office hours"], "filters": {"doc_type": "schedule"}}
+{"query": "Where is the submission form for Week 3?", "must_have": ["form", "Week 3"], "gold_sources": ["Intern FAQ - AI Bootcamp.pdf"], "filters": {"doc_type": "schedule", "week": 3}}
+{"query": "Resources for designers in Week 2", "must_have": ["resources", "designer"], "filters": {"doc_type": "resources", "week": 2, "audience": "designer"}}

@@ -5,6 +5,7 @@ import re
 from typing import Iterable, Optional
 
 _BULLET = r"(?:^[\s>*\-•◦▪●·\d]+\)|^[\s>*\-•◦▪●·]+)"  # simple bullet/number prefix
+_NUMBERED_LIST = r"^\d+\.\s+"  # numbered list pattern (1. 2. 3.)
 _URL = r"(https?://[^\s)]+)"
 _EMOJI = r"[\U00010000-\U0010ffff]"  # extended emoji
 
@@ -51,6 +52,13 @@ def remove_bullets(s: str) -> str:
     return "\n".join(cleaned)
 
 
+def remove_numbered_lists(s: str) -> str:
+    # remove only numbered list patterns (1. 2. 3.) while preserving content
+    lines = s.splitlines()
+    cleaned = [re.sub(_NUMBERED_LIST, "", ln).strip() for ln in lines]
+    return "\n".join(cleaned)
+
+
 def normalize_urls(s: str) -> str:
     # remove noise like parentheses/comma after URL
     s = re.sub(rf"{_URL}[\),\.]+", r"\1", s)
@@ -67,6 +75,7 @@ def normalize_text(
     header_footer_patterns: Optional[Iterable[str]] = None,
     remove_emoji: bool = True,
     remove_bullet: bool = True,
+    remove_numbered_lists_only: bool = False,
 ) -> str:
     if not raw:
         return ""
@@ -75,8 +84,11 @@ def normalize_text(
     lines = strip_header_footer(lines, header_footer_patterns)
     s = "\n".join(lines)
 
-    # 2) remove bullet
-    s = remove_bullets(s)
+    # 2) remove bullet or numbered lists based on option
+    if remove_numbered_lists_only:
+        s = remove_numbered_lists(s)
+    elif remove_bullet:
+        s = remove_bullets(s)
 
     # 3) normalize URL
     s = normalize_urls(s)

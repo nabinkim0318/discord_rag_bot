@@ -1,0 +1,189 @@
+name: Code Quality & Formatting
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.11, 3.12]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: |
+          cd backend && poetry install --no-interaction --no-ansi
+          cd ../rag_agent && poetry install --no-interaction --no-ansi
+
+      - name: Install pre-commit
+        run: |
+          pip install pre-commit
+          pre-commit install
+
+      # 1. Import 정리 및 기본 포맷팅
+      - name: Run isort
+        run: |
+          cd backend && poetry run isort --check-only --profile black --line-length 88 .
+          cd ../rag_agent && poetry run isort --check-only --profile black --line-length 88 .
+
+      # 2. 코드 스타일 포맷팅 검사
+      - name: Run black
+        run: |
+          cd backend && poetry run black --check --line-length 88 .
+          cd ../rag_agent && poetry run black --check --line-length 88 .
+
+      # 3. 강력한 라인 길이 처리 검사
+      - name: Run yapf
+        run: |
+          cd backend && poetry run yapf --style='{based_on_style: pep8, column_limit: 88}' --diff .
+          cd ../rag_agent && poetry run yapf --style='{based_on_style: pep8, column_limit: 88}' --diff .
+
+      # 4. 빠르고 강력한 린터
+      - name: Run ruff
+        run: |
+          cd backend && poetry run ruff check --line-length 88 .
+          cd ../rag_agent && poetry run ruff check --line-length 88 .
+
+      # 5. 기본 린팅
+      - name: Run flake8
+        run: |
+          cd backend && poetry run flake8 --max-line-length=88 --extend-ignore=E203,W503 .
+          cd ../rag_agent && poetry run flake8 --max-line-length=88 --extend-ignore=E203,W503 .
+
+      # 6. 보안 취약점 검사
+      - name: Run bandit
+        run: |
+          cd backend && poetry run bandit -r . -f json -o bandit-report.json || true
+          cd ../rag_agent && poetry run bandit -r . -f json -o bandit-report.json || true
+
+      # 7. 타입 체킹
+      - name: Run mypy
+        run: |
+          cd backend && poetry run mypy --ignore-missing-imports --no-strict-optional . || true
+          cd ../rag_agent && poetry run mypy --ignore-missing-imports --no-strict-optional . || true
+
+      # 8. 테스트 실행
+      - name: Run tests
+        run: |
+          cd backend && poetry run pytest --cov=app --cov-report=xml --cov-report=html
+          cd ../rag_agent && poetry run pytest --cov=. --cov-report=xml --cov-report=html
+
+      # 9. Docker 파일 검사
+      - name: Run hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: backend/Dockerfile
+          ignore: DL3008,DL3009
+
+      - name: Run hadolint (bots)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: bots/Dockerfile
+          ignore: DL3008,DL3009
+
+      - name: Run hadolint (rag_agent)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: rag_agent/Dockerfile
+          ignore: DL3008,DL3009
+
+      - name: Run hadolint (frontend)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: frontend/Dockerfile
+          ignore: DL3008,DL3009
+
+      # 10. Coverage 리포트 업로드
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./backend/coverage.xml,./rag_agent/coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+
+      # 11. 보안 리포트 업로드
+      - name: Upload bandit reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: bandit-reports
+          path: |
+            backend/bandit-report.json
+            rag_agent/bandit-report.json
+
+  # 자동 포맷팅 (PR에 대한 자동 수정)
+  auto-format:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+
+      - name: Install dependencies
+        run: |
+          cd backend && poetry install --no-interaction --no-ansi
+          cd ../rag_agent && poetry install --no-interaction --no-ansi
+
+      - name: Auto-format code
+        run: |
+          # Import 정리
+          cd backend && poetry run isort --profile black --line-length 88 .
+          cd ../rag_agent && poetry run isort --profile black --line-length 88 .
+
+          # 코드 포맷팅
+          cd backend && poetry run black --line-length 88 .
+          cd ../rag_agent && poetry run black --line-length 88 .
+
+          # 라인 길이 처리
+          cd backend && poetry run yapf --in-place --style='{based_on_style: pep8, column_limit: 88}' .
+          cd ../rag_agent && poetry run yapf --in-place --style='{based_on_style: pep8, column_limit: 88}' .
+
+          # Ruff 자동 수정
+          cd backend && poetry run ruff check --fix --line-length 88 .
+          cd ../rag_agent && poetry run ruff check --fix --line-length 88 .
+
+      - name: Commit changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git diff --staged --quiet || git commit -m "Auto-format code [skip ci]"
+          git push

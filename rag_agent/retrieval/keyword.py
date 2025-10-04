@@ -8,7 +8,7 @@ from rag_agent.indexing.sqlite_fts import bm25_search as _bm25_search
 
 
 def _make_highlights(
-    text: str, query: str, max_snips: int = 2, window: int = 60
+    text: str, query: str, max_snips: int = 2, window: int = 100
 ) -> List[str]:
     # very lightweight highlights: extract window around matching query terms
     terms = [t for t in re.split(r"\W+", query) if t]

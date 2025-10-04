@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+from rag_agent.core.logging import logger
+
 
 def test_import_rag_modules():
     """
@@ -18,10 +20,10 @@ def test_import_rag_modules():
         import ingestion  # noqa: F401
         import retrieval  # noqa: F401
 
-        print("✅ All core RAG agent modules imported successfully")
+        logger.info("✅ All core RAG agent modules imported successfully")
         assert True
     except ImportError as e:
-        print(f"❌ Failed to import RAG agent modules: {e}")
+        logger.warning(f"❌ Failed to import RAG agent modules: {e}")
         assert False, f"Failed to import RAG agent modules: {e}"
 
 
@@ -42,6 +44,6 @@ def test_module_files_exist():
     for module_path in required_modules:
         full_path = rag_agent_dir / module_path
         assert full_path.exists(), f"Required module file not found: {module_path}"
-        print(f"✅ Found {module_path}")
+        logger.info(f"✅ Found {module_path}")
 
-    print("✅ All required module files exist")
+    logger.info("✅ All required module files exist")

@@ -53,32 +53,34 @@ class Settings:
     # ==================== Weaviate Settings ====================
     WEAVIATE_URL: str = os.getenv("WEAVIATE_URL", "http://weaviate:8080")
     WEAVIATE_API_KEY: Optional[str] = os.getenv("WEAVIATE_API_KEY")
-    WEAVIATE_CLASS_NAME: str = os.getenv("WEAVIATE_CLASS_NAME", "RAGDocument")
+    WEAVIATE_CLASS_NAME: str = os.getenv("WEAVIATE_CLASS_NAME", "KBChunk")
     WEAVIATE_BATCH_SIZE: int = int(os.getenv("WEAVIATE_BATCH_SIZE", "100"))
 
     # ==================== Database Settings ====================
     DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL")
 
     # ==================== Security Settings ====================
-    SECRET_KEY: str = "your-secret-key-here"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(
+        os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
+    )
 
     # ==================== CORS Settings ====================
-    CORS_ORIGINS: List[str] = [
-        "http://localhost:3000",  # Frontend
-        "http://localhost:3001",  # Grafana
-        "http://localhost:3002",  # Grafana (alternative)
-        "http://localhost:8001",  # Backend API
-        "http://localhost:9090",  # Prometheus
-    ]
-    CORS_ALLOW_CREDENTIALS: bool = True
+    CORS_ORIGINS: List[str] = os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:3000,http://localhost:3001,"
+        "http://localhost:8001,http://localhost:9090",
+    ).split(",")
+    CORS_ALLOW_CREDENTIALS: bool = (
+        os.getenv("CORS_ALLOW_CREDENTIALS", "true").lower() == "true"
+    )
 
     # ==================== Rate Limiting ====================
-    RATE_LIMIT_PER_MINUTE: int = 60
+    RATE_LIMIT_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
 
     # ==================== Metrics Settings ====================
-    METRICS_ENABLED: bool = True
-    METRICS_PATH: str = "/metrics"
+    METRICS_ENABLED: bool = os.getenv("METRICS_ENABLED", "true").lower() == "true"
+    METRICS_PATH: str = os.getenv("METRICS_PATH", "/metrics")
 
 
 # Global settings instance

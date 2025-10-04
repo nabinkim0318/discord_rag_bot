@@ -139,7 +139,7 @@ curl http://localhost:8001/metrics | grep "rag_discord"
 
 ### 2. Grafana Dashboard
 
-- URL: http://localhost:3000
+- URL: <http://localhost:3000>
 - Basic dashboard: `simple-dashboard.json`
 - Enhanced metrics panels can be added
 

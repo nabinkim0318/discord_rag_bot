@@ -81,7 +81,7 @@ class EnhancedRetriever:
         results_by_intent = {}
         for intent in query_plan.intents:
             intent_results = self._retrieve_for_intent(intent)
-            results_by_intent[intent.intent] = intent_results
+            results_by_intent.setdefault(intent.intent, []).extend(intent_results)
 
         # 2. Merge results and re-rank
         final_results = self._merge_and_rerank(results_by_intent, query_plan)
@@ -142,66 +142,18 @@ class EnhancedRetriever:
     def _convert_to_sqlite_filters(
         self, filters: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
-        """Convert to SQLite filters"""
-        if not filters:
-            return None
-
-        sqlite_filters = {}
-
-        # doc_type filter
-        if "doc_type" in filters:
-            sqlite_filters["doc_type"] = filters["doc_type"]
-
-        # week filter
-        if "week" in filters:
-            sqlite_filters["week"] = filters["week"]
-
-        # audience filter
-        if "audience" in filters:
-            sqlite_filters["audience"] = filters["audience"]
-
-        return sqlite_filters if sqlite_filters else None
+        """Convert to SQLite filters - disabled due to schema mismatch"""
+        # TODO: Enable after adding doc_type, week, audience columns to SQLite
+        # Currently disabled due to schema mismatch
+        return None
 
     def _convert_to_weaviate_filters(
         self, filters: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
-        """Convert to Weaviate filters"""
-        if not filters:
-            return None
-
-        weaviate_filters = []
-
-        # doc_type filter
-        if "doc_type" in filters:
-            weaviate_filters.append(
-                {
-                    "path": ["doc_type"],
-                    "operator": "Equal",
-                    "valueString": filters["doc_type"],
-                }
-            )
-
-        # week filter
-        if "week" in filters:
-            weaviate_filters.append(
-                {"path": ["week"], "operator": "Equal", "valueInt": filters["week"]}
-            )
-
-        # audience filter
-        if "audience" in filters:
-            weaviate_filters.append(
-                {
-                    "path": ["audience"],
-                    "operator": "Equal",
-                    "valueString": filters["audience"],
-                }
-            )
-
-        if len(weaviate_filters) == 1:
-            return weaviate_filters[0]
-        elif len(weaviate_filters) > 1:
-            return {"operator": "And", "operands": weaviate_filters}
-
+        """Convert to Weaviate filters - disabled due to schema mismatch"""
+        # TODO: Enable after adding doc_type, week, audience properties to Weaviate
+        # Currently disabled due to schema mismatch
+        # For metadata_json cases, recommend post-filtering in Python
         return None
 
     def _merge_and_rerank(

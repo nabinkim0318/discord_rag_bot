@@ -1,6 +1,6 @@
 # rag_agent/generation/prompt_builder.py
 # Prompt engineering template collection
-# → ✅ example: build_prompt(context, query) → str
+# -> example: build_prompt(context, query) -> str
 
 import random
 from datetime import datetime

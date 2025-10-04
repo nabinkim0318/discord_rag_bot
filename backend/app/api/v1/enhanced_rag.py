@@ -6,7 +6,7 @@ Enhanced RAG API endpoints
 - Discord-optimized responses
 """
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 
 from app.core.metrics import record_failure_metric
 from app.models.rag import RAGQueryRequest, RAGQueryResponse
@@ -49,7 +49,16 @@ async def enhanced_query_rag(request: RAGQueryRequest, http_request: Request):
 
     except Exception as e:
         record_failure_metric("/api/v1/enhanced-rag/", "pipeline_error")
-        raise HTTPException(status_code=500, detail=str(e))
+        from app.core.exceptions import RAGException
+
+        raise RAGException(
+            message=f"Enhanced RAG pipeline failed: {str(e)}",
+            error_code="ENHANCED_RAG_PIPELINE_ERROR",
+            details={
+                "stage": "enhanced_generation",
+                "endpoint": "/api/v1/enhanced-rag/",
+            },
+        )
 
 
 @enhanced_rag_router.get("/health")

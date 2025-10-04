@@ -60,6 +60,24 @@ feedback_counter = create_counter(
     "feedback_total", "Total number of feedbacks received", ["type"]
 )
 
+feedback_submissions = create_counter(
+    "feedback_submissions_total", "Total number of feedback submissions", ["score"]
+)
+
+feedback_satisfaction_rate = create_gauge(
+    "feedback_satisfaction_rate", "User satisfaction rate (up votes / total votes)"
+)
+
+# ==================== Request Metrics ====================
+
+rag_requests_total = create_counter(
+    "rag_requests_total", "Total number of RAG requests", ["endpoint"]
+)
+
+rag_failures_total = create_counter(
+    "rag_failures_total", "Total number of RAG failures", ["endpoint", "error_type"]
+)
+
 # ==================== Circuit Breaker Metrics ====================
 
 circuit_breaker_state = create_gauge(
@@ -138,6 +156,12 @@ def record_feedback_metric(feedback_type: str):
 def record_failure_metric(endpoint: str, error_type: str):
     """Record failed request metric"""
     rag_query_failures.labels(endpoint=endpoint, error_type=error_type).inc()
+    rag_failures_total.labels(endpoint=endpoint, error_type=error_type).inc()
+
+
+def record_rag_request(endpoint: str):
+    """Record RAG request metric"""
+    rag_requests_total.labels(endpoint=endpoint).inc()
 
 
 def record_rag_pipeline_latency(seconds: float):

@@ -25,6 +25,8 @@ PyMuPDF = "^1.23.0"
 loguru = "^0.7.0"
 prometheus-client = "^0.22.1"
 prometheus-fastapi-instrumentator = "^7.1.0"
+yapf = "^0.43.0"
+ruff = "^0.13.3"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.4.2"

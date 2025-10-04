@@ -1,6 +1,7 @@
 # scripts/smoke_retrieval.py
 import time
 
+from rag_agent.core.logging import logger
 from rag_agent.retrieval.retrieval_pipeline import search_hybrid
 
 from backend.app.core.metrics import record_rag_pipeline_latency
@@ -17,6 +18,6 @@ if __name__ == "__main__":
     )
     elapsed = time.time() - t0
     record_rag_pipeline_latency(elapsed)
-    print("RESULT N =", len(res))
+    logger.info(f"RESULT N = {len(res)}")
     for r in res[:3]:
-        print(r["chunk_uid"], r["score"], r.get("highlights", [])[:1])
+        logger.info(f"{r['chunk_uid']} {r['score']} {r.get('highlights', [])[:1]}")
