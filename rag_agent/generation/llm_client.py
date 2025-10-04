@@ -1,59 +1,107 @@
 # rag_agent/generation/llm_client.py
 from __future__ import annotations
 
+import logging
+import os
 import sys
+import time
 from pathlib import Path
-from typing import Generator, Optional
+from typing import Generator, Optional, Tuple
 
 from dotenv import load_dotenv
 
-from app.core.config import settings
-from app.core.logging import logger
-from app.core.retry import retry_openai
+# add project root to Python path
+project_root = Path(__file__).parent.parent
+print(project_root)
+sys.path.insert(0, str(project_root))
 
-# Load environment variables from root .env file
-root_dir = Path(__file__).parent.parent.parent.parent
-env_path = root_dir / ".env"
-if env_path.exists():
-    load_dotenv(env_path)
+# load environment variables from project root
+print(project_root / ".env")
+load_dotenv(project_root / ".env")
 
-# backend 디렉토리를 Python 경로에 추가
-backend_dir = Path(__file__).parent.parent.parent / "backend"
-if str(backend_dir) not in sys.path:
-    sys.path.insert(0, str(backend_dir))
+logger = logging.getLogger(__name__)
 
+ROOT = Path(__file__).resolve().parents[3]  # repo root
+load_dotenv(ROOT / ".env")  # ✅ root .env only
+
+
+# Try OpenAI SDK 1.x
 try:
-    # OpenAI SDK 1.x
-    from openai import AzureOpenAI, OpenAI
-except Exception:
+    from openai import AzureOpenAI, OpenAI  # type: ignore
+except Exception:  # SDK not installed, module still loads
     OpenAI = None
     AzureOpenAI = None
 
 
-def _make_client():
-    """
-    OpenAI / Azure OpenAI / OpenAI-compatible(DeepSeek 등) 클라이언트 구성
-    """
-    if AzureOpenAI and settings.AZURE_OPENAI_API_KEY and settings.AZURE_OPENAI_ENDPOINT:
-        return AzureOpenAI(
-            api_key=settings.AZURE_OPENAI_API_KEY,
-            api_version="2024-02-15-preview",
-            azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
-        ), ("azure", settings.AZURE_OPENAI_DEPLOYMENT or settings.LLM_MODEL)
+# -------------------------------
+# Small retry decorator (backoff+jitter)
+# -------------------------------
+def _retry(max_attempts: int = 3, base_delay: float = 0.5, max_delay: float = 8.0):
+    def deco(fn):
+        def wrapper(*args, **kwargs):
+            attempt = 0
+            delay = base_delay
+            last_err = None
+            while attempt < max_attempts:
+                try:
+                    return fn(*args, **kwargs)
+                except Exception as e:
+                    last_err = e
+                    attempt += 1
+                    if attempt >= max_attempts:
+                        break
+                    sleep_for = min(max_delay, delay)
+                    logger.warning(
+                        f"[llm_client] attempt {attempt}/{max_attempts} failed: {e}. "
+                        f"retrying in {sleep_for:.2f}s"
+                    )
+                    time.sleep(sleep_for)
+                    delay *= 2.0
+            raise last_err  # re-raise last error
 
-    if OpenAI and settings.OPENAI_API_KEY:
-        base_url = settings.LLM_API_BASE_URL or None  # DeepSeek 등 호환 엔드포인트
-        return OpenAI(api_key=settings.OPENAI_API_KEY, base_url=base_url), (
-            "openai",
-            settings.LLM_MODEL,
+        return wrapper
+
+    return deco
+
+
+# -------------------------------
+# Client factory
+# -------------------------------
+def _make_client() -> Tuple[object, Tuple[str, str]]:
+    """
+    Return: (client, (kind, model_or_deployment))
+      - kind: "azure" | "openai"
+    Priority: Azure OpenAI → OpenAI/compatible
+    """
+    # Azure OpenAI priority
+    if (
+        AzureOpenAI
+        and os.getenv("AZURE_OPENAI_API_KEY")
+        and os.getenv("AZURE_OPENAI_ENDPOINT")
+    ):
+        dep = os.getenv("AZURE_OPENAI_DEPLOYMENT")
+        if not dep:
+            raise RuntimeError("AZURE_OPENAI_DEPLOYMENT is required.")
+        cli = AzureOpenAI(
+            api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
         )
+        return cli, ("azure", dep)
+    if OpenAI and os.getenv("OPENAI_API_KEY"):
+        cli = OpenAI(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            base_url=os.getenv("OPENAI_BASE_URL") or None,
+        )
+        mdl = os.getenv("LLM_MODEL", "gpt-4o-mini")
+        return cli, ("openai", mdl)
+    raise RuntimeError("No LLM credentials. Set Azure or OpenAI envs.")
 
-    raise RuntimeError(
-        "No LLM credentials found. Set OPENAI_API_KEY or Azure OpenAI vars."
-    )
 
-
-@retry_openai(max_attempts=3)
+# -------------------------------
+# Main call function
+# -------------------------------
+@_retry()
 def llm_generate(
     prompt: str,
     *,
@@ -61,73 +109,36 @@ def llm_generate(
     max_tokens: Optional[int] = None,
     temperature: float = 0.2,
     stream: bool = False,
+    force_json: bool = False,  # ✅ v2.1 대비
 ) -> str | Generator[str, None, None]:
-    """
-    Chat Completions wrapper. 비스트리밍 시 최종 텍스트, 스트리밍 시 토큰 generator 반환.
-    """
-    client, (kind, model_or_deploy) = _make_client()
-    max_tokens = max_tokens or settings.GENERATION_MAX_TOKENS
 
-    messages = []
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
-    messages.append({"role": "user", "content": prompt})
+    client, (kind, model) = _make_client()
+    max_tokens = max_tokens or int(os.getenv("LLM_MAX_TOKENS", "600"))
 
-    logger.debug(
-        f"Calling LLM [{kind}:{model_or_deploy}] tokens={max_tokens}, stream={stream}"
+    msgs = [{"role": "system", "content": system_prompt}] if system_prompt else []
+    msgs.append({"role": "user", "content": prompt})
+
+    kwargs = dict(
+        model=model,
+        messages=msgs,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        stream=stream,
     )
+    # OpenAI 일부 모델: response_format 지원
+    if force_json and kind == "openai":
+        kwargs["response_format"] = {"type": "json_object"}
 
-    if kind == "azure":
-        # Azure: model=deployment name
-        if stream:
-            resp = client.chat.completions.create(
-                model=model_or_deploy,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                stream=True,
-            )
-
-            def gen():
-                for chunk in resp:
-                    delta = chunk.choices[0].delta.content or ""
-                    if delta:
-                        yield delta
-
-            return gen()
-        else:
-            resp = client.chat.completions.create(
-                model=model_or_deploy,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                stream=False,
-            )
-            return resp.choices[0].message.content or ""
-
-    # OpenAI / compatible
     if stream:
-        resp = client.chat.completions.create(
-            model=model_or_deploy,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            stream=True,
-        )
+        resp = client.chat.completions.create(**kwargs)
 
         def gen():
-            for chunk in resp:
-                delta = chunk.choices[0].delta.content or ""
+            for ch in resp:
+                delta = getattr(ch.choices[0].delta, "content", "") or ""
                 if delta:
                     yield delta
 
         return gen()
     else:
-        resp = client.chat.completions.create(
-            model=model_or_deploy,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            stream=False,
-        )
+        resp = client.chat.completions.create(**kwargs)
         return resp.choices[0].message.content or ""

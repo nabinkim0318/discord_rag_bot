@@ -2,18 +2,29 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
 import os
 import random
+from pathlib import Path
 from typing import List, Optional
+
+from dotenv import load_dotenv
 
 # Options:
 # 1) OpenAI (env: OPENAI_API_KEY) + text-embedding-3-small (assume English)
 # 2) Local replacement (free): Hash-based pseudo-embedding (for testing/development)
 
+log = logging.getLogger(__name__)
+
+# ── .env: 레포 루트 한 번만 로드(다른 파일들과 일치)
+ROOT = Path(__file__).resolve().parents[3]
+load_dotenv(ROOT / ".env")
+
+# OpenAI SDK 1.x 가용성 체크
 _OPENAI_READY = False
 try:
-    import openai  # openai>=1.*
+    from openai import OpenAI  # openai>=1.*
 
     _OPENAI_READY = True
 except Exception:
@@ -30,21 +41,35 @@ def _pseudo_embed(s: str, dim: int = 384) -> List[float]:
     return [x / norm for x in v]
 
 
+def _openai_client() -> Optional[OpenAI]:
+    if not _OPENAI_READY:
+        return None
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return None
+    base_url = os.getenv("OPENAI_BASE_URL") or None  # ✅ compatible endpoint 지원
+    try:
+        return OpenAI(api_key=api_key, base_url=base_url)
+    except Exception as e:
+        log.warning(f"[embeddings] OpenAI client init failed: {e}")
+        return None
+
+
 def embed_texts(texts: List[str], model: Optional[str] = None) -> List[List[float]]:
     """
-    Default: use text-embedding-3-small if OpenAI is available,
-    otherwise use pseudo-embedding.
+    Priority:
+    1) OpenAI(or compatible) API +
+    selected model/basic model(text-embedding-3-small)
+    2) Local replacement pseudo-embedding(for testing/development)
     """
-    api_key = os.getenv("OPENAI_API_KEY")
-    if _OPENAI_READY and api_key:
-        openai.api_key = api_key
-        mdl = model or "text-embedding-3-small"
-        # openai>=1.* example (responses API instead of embeddings)
-        from openai import OpenAI
+    cli = _openai_client()
+    if cli:
+        mdl = model or os.getenv("OPENAI_EMBED_MODEL", "text-embedding-3-small")
+        try:
+            res = cli.embeddings.create(model=mdl, input=texts)
+            return [d.embedding for d in res.data]
+        except Exception as e:
+            log.warning(f"[embeddings] API call failed, falling back to pseudo: {e}")
 
-        client = OpenAI(api_key=api_key)
-        res = client.embeddings.create(model=mdl, input=texts)
-        return [d.embedding for d in res.data]
-    else:
-        # Local replacement
-        return [_pseudo_embed(t) for t in texts]
+    # Fallback
+    return [_pseudo_embed(t) for t in texts]

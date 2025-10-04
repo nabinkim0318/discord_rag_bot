@@ -22,8 +22,8 @@ from rag_agent.search.hybrid_search import hybrid_retrieve
 @dataclass
 class EvaluationConfig:
     sqlite_path: str = "rag_kb.sqlite3"
-    k_bm25: int = 20
-    k_vec: int = 20
+    k_bm25: int = 30
+    k_vec: int = 30
     k_final: int = 8
     bm25_weight: float = 0.4
     vec_weight: float = 0.6

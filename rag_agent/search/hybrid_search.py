@@ -3,7 +3,17 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from dotenv import load_dotenv
+from rag_agent.indexing.sqlite_fts import bm25_search
+from rag_agent.search.mmr import mmr_rerank
+
+# ── .env: Repo root only once (match other files)
+ROOT = Path(__file__).resolve().parents[3]
+load_dotenv(ROOT / ".env")
+
 
 try:
     from rag_agent.indexing.embeddings import embed_texts
@@ -13,9 +23,6 @@ except ImportError:
         # dummy implementation - should be replaced with actual embedding
         return [[0.0] * 384 for _ in texts]
 
-
-from rag_agent.indexing.sqlite_fts import bm25_search
-from rag_agent.search.mmr import mmr_rerank
 
 # Weaviate v3 client used
 try:
@@ -129,8 +136,8 @@ def hybrid_retrieve_v2(
     query: str,
     *,
     sqlite_path: str,
-    k_bm25: int = 20,
-    k_vec: int = 20,
+    k_bm25: int = 30,
+    k_vec: int = 30,
     k_final: int = 8,
     bm25_weight: float = 0.4,
     vec_weight: float = 0.6,
