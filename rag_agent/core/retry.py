@@ -2,6 +2,7 @@
 """
 Configuration for using backend retry in rag_agent
 """
+
 import asyncio
 import inspect
 

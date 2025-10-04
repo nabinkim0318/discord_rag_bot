@@ -2,6 +2,7 @@
 """
 Test script for feedback service
 """
+
 import asyncio
 import sys
 from pathlib import Path

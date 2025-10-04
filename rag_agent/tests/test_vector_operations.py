@@ -266,7 +266,7 @@ def main():
 
     logger.info("\n📊 Vector Operations Test Results")
     logger.info(f"Passed: {passed}/{total}")
-    logger.info(f"Success rate: {passed/total*100:.1f}%")
+    logger.info(f"Success rate: {passed / total * 100:.1f}%")
 
     return passed == total
 

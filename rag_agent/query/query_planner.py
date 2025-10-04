@@ -8,6 +8,7 @@ Query decomposition & intent detection (English-first, multi-intent)
 - Extracts structure: week(s), audience
 - Emits normalized filters for retrieval
 """
+
 from __future__ import annotations
 
 import re

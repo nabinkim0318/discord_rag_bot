@@ -18,6 +18,7 @@ Usage examples:
     # bulk indexing by doc_id (optimized performance)
     count = bulk_upsert_by_doc_id(chunks)
 """
+
 from __future__ import annotations
 
 import json

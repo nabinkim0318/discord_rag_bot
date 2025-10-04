@@ -148,7 +148,7 @@ Links should be formatted as <title|URL>.
             for i, result in enumerate(results[:3], 1):  # Top 3 only
                 intent_section += f"""
 **{i}. {result.source}**
-{result.content[:300]}{'...' if len(result.content) > 300 else ''}
+{result.content[:300]}{"..." if len(result.content) > 300 else ""}
 Score: {result.score:.3f}
 """
 
@@ -160,7 +160,7 @@ Score: {result.score:.3f}
             for i, result in enumerate(retrieval_result.final_results[:5], 1):
                 final_section += f"""
 **{i}. {result.source}** (Intent: {result.intent})
-{result.content[:200]}{'...' if len(result.content) > 200 else ''}
+{result.content[:200]}{"..." if len(result.content) > 200 else ""}
 Score: {result.score:.3f}
 """
             context_parts.append(final_section)

@@ -2,6 +2,7 @@
 """
 Configuration for using backend metrics in rag_agent
 """
+
 from ._bootstrap import attach_backend_path, get_fallback_logger
 
 # Attach backend path
