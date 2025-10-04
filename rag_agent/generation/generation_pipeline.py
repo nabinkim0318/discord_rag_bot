@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
-from app.core.config import settings
-
 from rag_agent.core._bootstrap import attach_backend_path
 from rag_agent.generation.context_packer import pack_contexts, render_context_block
 from rag_agent.generation.llm_client import llm_generate
@@ -14,6 +12,8 @@ from rag_agent.search.hybrid_search import hybrid_retrieve
 
 # Attach backend path and import settings
 attach_backend_path()
+
+from app.core.config import settings  # noqa: E402
 
 
 def generate_answer(

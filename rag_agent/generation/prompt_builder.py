@@ -6,13 +6,13 @@ import random
 from datetime import datetime
 from typing import Any, Dict, List
 
-from app.core.logging import logger
-from app.core.metrics import record_prompt_version
-
 from rag_agent.core._bootstrap import attach_backend_path
 
 # Attach backend path
 attach_backend_path()
+
+from app.core.logging import logger  # noqa: E402
+from app.core.metrics import record_prompt_version  # noqa: E402
 
 
 class PromptBuilder:
