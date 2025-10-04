@@ -10,7 +10,16 @@ from app.core.metrics import (
     record_retriever_topk,
 )
 
-# Note: generate_answer import removed to avoid rag_agent dependency
+# Import actual RAG pipeline from rag_agent
+try:
+    from rag_agent.generation.generation_pipeline import (
+        generate_answer as rag_generate_answer,
+    )
+
+    RAG_AGENT_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"rag_agent not available: {e}")
+    RAG_AGENT_AVAILABLE = False
 
 
 def generate_answer_mock(
@@ -79,21 +88,56 @@ def generate_answer(
     filters_fts: Optional[str] = None,
     filters_weaviate: Optional[Dict[str, Any]] = None,
 ):
-    # Mock 구현으로 대체 (실제 파이프라인은 나중에 구현)
-    return generate_answer_mock(
-        query,
-        k_bm25=k_bm25,
-        k_vec=k_vec,
-        k_final=k_final,
-        bm25_weight=bm25_weight,
-        vec_weight=vec_weight,
-        mmr_lambda=mmr_lambda,
-        reranker=reranker,
-        prompt_version=prompt_version,
-        stream=stream,
-        filters_fts=filters_fts,
-        filters_weaviate=filters_weaviate,
-    )
+    # 실제 RAG 파이프라인 사용 (가능한 경우)
+    if RAG_AGENT_AVAILABLE:
+        try:
+            return rag_generate_answer(
+                query,
+                k_bm25=k_bm25,
+                k_vec=k_vec,
+                k_final=k_final,
+                bm25_weight=bm25_weight,
+                vec_weight=vec_weight,
+                mmr_lambda=mmr_lambda,
+                reranker=reranker,
+                prompt_version=prompt_version,
+                stream=stream,
+                filters_fts=filters_fts,
+                filters_weaviate=filters_weaviate,
+            )
+        except Exception as e:
+            logger.warning(f"RAG pipeline failed, falling back to mock: {e}")
+            return generate_answer_mock(
+                query,
+                k_bm25=k_bm25,
+                k_vec=k_vec,
+                k_final=k_final,
+                bm25_weight=bm25_weight,
+                vec_weight=vec_weight,
+                mmr_lambda=mmr_lambda,
+                reranker=reranker,
+                prompt_version=prompt_version,
+                stream=stream,
+                filters_fts=filters_fts,
+                filters_weaviate=filters_weaviate,
+            )
+    else:
+        # rag_agent가 사용 불가능한 경우 mock 사용
+        logger.warning("Using mock generate_answer - rag_agent not available")
+        return generate_answer_mock(
+            query,
+            k_bm25=k_bm25,
+            k_vec=k_vec,
+            k_final=k_final,
+            bm25_weight=bm25_weight,
+            vec_weight=vec_weight,
+            mmr_lambda=mmr_lambda,
+            reranker=reranker,
+            prompt_version=prompt_version,
+            stream=stream,
+            filters_fts=filters_fts,
+            filters_weaviate=filters_weaviate,
+        )
 
 
 def generate_answer_adapter(
