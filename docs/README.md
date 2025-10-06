@@ -1,5 +1,20 @@
 # Discord RAG Bot
 
+## Documentation Index
+
+- Getting Started: `DOCKER.md`
+- System Guide: `RAG_SYSTEM_GUIDE.md`
+- Contributing: `CONTRIBUTING.md`
+- Observability: `observability.md`
+- Test Structure: `TEST_STRUCTURE.md`
+
+## Roles & Responsibilities
+
+- Discord Bot: Slash commands, feedback buttons, regenerate
+- Backend API: `/api/query/`, `/api/v1/feedback`, health endpoints
+- RAG Engine: Hybrid retrieval (BM25+Vector), Cross-Encoder rerank, MMR, context packing
+- Monitoring: Prometheus metrics, Grafana dashboards
+
 A comprehensive RAG system with Discord bot integration, enhanced monitoring, and feedback collection.
 
 ## 🚀 Features
