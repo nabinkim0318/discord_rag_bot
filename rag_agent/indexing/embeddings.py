@@ -1,11 +1,8 @@
 # rag_agent/indexing/embeddings.py
 from __future__ import annotations
 
-import hashlib
 import logging
-import math
 import os
-import random
 from pathlib import Path
 from typing import List, Optional
 
@@ -29,16 +26,6 @@ try:
     _OPENAI_READY = True
 except Exception:
     _OPENAI_READY = False
-
-
-def _pseudo_embed(s: str, dim: int = 384) -> List[float]:
-    """Reproducible vector without external API (for testing/development)."""
-    h = hashlib.sha1(s.encode("utf-8")).digest()
-    rng = random.Random(h)  # seed fixed
-    v = [rng.uniform(-1, 1) for _ in range(dim)]
-    # L2 normalize
-    norm = math.sqrt(sum(x * x for x in v)) or 1.0
-    return [x / norm for x in v]
 
 
 def _openai_client() -> Optional[OpenAI]:
@@ -71,5 +58,6 @@ def embed_texts(texts: List[str], model: Optional[str] = None) -> List[List[floa
         except Exception as e:
             log.warning(f"[embeddings] API call failed, falling back to pseudo: {e}")
 
-    # Fallback
-    return [_pseudo_embed(t) for t in texts]
+    # Fallback - return zero vectors
+    log.warning("[embeddings] No fallback available, returning zero vectors")
+    return [[0.0] * 384 for _ in texts]

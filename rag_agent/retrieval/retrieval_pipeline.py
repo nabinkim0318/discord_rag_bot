@@ -299,7 +299,7 @@ def search_hybrid(
             weights=[bm25_weight, vec_weight],
             c=rrf_c,
         )
-    # ── 넉넉한 풀 구성 (Protected-Top seeds 포함) + per-doc cap
+    # ── Build a sufficiently large candidate pool (including Protected-Top seeds) + per-doc cap
     present_uids = set()
     pool: List[Dict] = []
 
@@ -349,7 +349,7 @@ def search_hybrid(
     # Note: Seeds (bm_seed, ve_seed) are already in pool via _add_seed()
     # No need to force them into final - let CE reranking decide
 
-    # 안전 Fallback 게이트: 상위 두 fused 점수 차가 매우 작고 vec top1이 매우 상위일 때만 top1 교체
+    # Safe fallback gate: if the top-2 fused scores are very close and the vector top1 ranks very high, replace top1
     try:
         if len(fused) >= 2 and ve_seed:
             top_diff = float(fused[0].get("score_fused", 0.0)) - float(
@@ -366,7 +366,7 @@ def search_hybrid(
     except Exception:
         pass
 
-    # ── (신규) Cross-Encoder rerank (optional)
+    # ── Cross-Encoder rerank (optional)
     try:
         if use_rerank and pool:
             reranked = rerank_cross_encoder(
@@ -379,7 +379,7 @@ def search_hybrid(
     except Exception:
         final = pool[:top_k_final]
 
-    # ── (신규) Feature Boost Layer for tie-breaking
+    # ── Feature Boost Layer for tie-breaking
     if final and use_rerank:
         try:
             final = _apply_feature_boost_layer(

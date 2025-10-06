@@ -48,14 +48,14 @@ COPY --chown=botuser:botuser . .
 RUN printf '#!/usr/bin/env python3\nimport os\nimport sys\n\nrequired_vars = ["DISCORD_BOT_TOKEN"]\nmissing = []\nfor var in required_vars:\n    if not os.getenv(var):\n        missing.append(var)\n\nif missing:\n    print(f"❌ Missing environment variables: {missing}")\n    sys.exit(1)\nelse:\n    print("✅ Environment variables validated")\n' > /usr/local/bin/validate_env.py && chmod +x /usr/local/bin/validate_env.py
 
 # Create startup script as root before switching user
-RUN printf '#!/bin/bash\nset -e\necho "🔍 Validating environment variables..."\npython /usr/local/bin/validate_env.py\necho "🤖 Starting Discord bot..."\nexec python run_bot.py' > /app/start.sh && chmod +x /app/start.sh && chown botuser:botuser /app/start.sh
+RUN printf '#!/bin/bash\nset -e\necho "🔍 Validating environment variables..."\npython /usr/local/bin/validate_env.py\necho "🤖 Starting Discord bot..."\nexec python discord/bot.py' > /app/start.sh && chmod +x /app/start.sh && chown botuser:botuser /app/start.sh
 
 # Switch to non-root user
 USER botuser
 
 # Health check (simple process check)
 HEALTHCHECK --interval=60s --timeout=10s --start-period=10s --retries=3 \
-    CMD pgrep -f "python.*run_bot.py" || exit 1
+    CMD pgrep -f "python.*discord/bot.py" || exit 1
 
 # Start application
 CMD ["/app/start.sh"]

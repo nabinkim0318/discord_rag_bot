@@ -89,6 +89,14 @@ services:
       - ./.env
     environment:
       - SERVICE_CONTEXT=bot
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - DISCORD_TEST_GUILD_ID=579281488789635083
+      - DISCORD_CLIENT_ID=1424785730307227769
+      - DISCORD_GUILD_ID=579281488789635083
+      - USE_ASSET_EMBEDS=false
+      - ASSET_UP_PATH=assets/thumbs-up.png
+      - ASSET_DOWN_PATH=assets/thumb-down.png
+      - ASSET_REGEN_PATH=assets/refresh-page-option.png
     depends_on:
       api: { condition: service_started }
     networks:

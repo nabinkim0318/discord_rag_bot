@@ -9,7 +9,6 @@ import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
-from interactions import Client, Intents
 
 # Set up basic logging
 logging.basicConfig(
@@ -37,7 +36,7 @@ async def main():
         logger.warning("💡 Add DISCORD_BOT_TOKEN to .env file.")
         return
 
-    guild_id = os.getenv("GUILD_ID")
+    guild_id = os.getenv("DISCORD_TEST_GUILD_ID")
     backend_base = os.getenv("BACKEND_BASE", "http://localhost:8001")
 
     logger.info("🤖 Discord RAG Bot starting...")
@@ -45,43 +44,14 @@ async def main():
     logger.info(f"🏠 Guild ID: {guild_id or 'Global'}")
     logger.info(f"🔗 Backend: {backend_base}")
 
-    # create bot client
-    bot = Client(
-        intents=Intents.DEFAULT | Intents.GUILD_MESSAGES,
-        sync_interactions=True,
-        asyncio_debug=True,
-    )
-
-    @bot.event
-    async def on_ready():
-        """when bot is ready"""
-        logger.info("✅ Discord bot connected successfully!")
-        logger.info(f"📊 Bot name: {bot.user.name}")
-        logger.info(f"🆔 Bot ID: {bot.user.id}")
-        logger.info(f"🏠 Connected servers: {len(bot.guilds)}")
-
-        # print connected servers
-        if bot.guilds:
-            logger.info("📋 Connected servers:")
-            for guild in bot.guilds:
-                logger.info(f"  - {guild.name} (ID: {guild.id})")
-
-        logger.info("🎉 Bot is ready! Use slash commands in Discord.")
-        logger.info(
-            "    Available commands: /ping, /ask, /feedback, /health, /config, /metrics"
-        )
-
-    @bot.event
-    async def on_error(event, *args, **kwargs):
-        """when error occurs"""
-        logger.warning(f"❌ Bot error: {event}")
-        import traceback
-
-        traceback.print_exc()
-
+    # Import and run the actual bot from discord/bot.py
     try:
-        # start bot
-        await bot.astart(token)
+        from discord.bot import BOT
+
+        logger.info("🤖 Starting Discord bot with full functionality...")
+
+        # Start the actual bot with all commands
+        BOT.start()
     except KeyboardInterrupt:
         logger.info("\n⏹️ Bot stopped.")
     except Exception as e:

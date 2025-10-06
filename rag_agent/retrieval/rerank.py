@@ -13,7 +13,7 @@ _MODEL_CACHE: Dict[str, "CrossEncoder"] = {}
 
 def get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
     if CrossEncoder is None:
-        raise RuntimeError("sentence-transformers가 설치되어 있지 않습니다.")
+        raise RuntimeError("sentence-transformers is not installed.")
     if model_name not in _MODEL_CACHE:
         _MODEL_CACHE[model_name] = CrossEncoder(model_name)
     return _MODEL_CACHE[model_name]

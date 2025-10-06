@@ -199,7 +199,7 @@ def main():
     with open(args.in_jsonl, "r", encoding="utf-8") as f:
         for i, line in enumerate(f, 1):
             line = line.strip()
-            if not line or line.startswith("이게"):
+            if not line or line.startswith("IGNORE_THIS"):
                 continue
 
             try:

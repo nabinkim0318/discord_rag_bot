@@ -62,8 +62,8 @@ class FeedbackService:
                 query = text(
                     """
                     INSERT INTO feedback (id, query_id, user_id,
-                    score, feedback, comment, created_at)
-                    VALUES (:id, :query_id, :user_id, :score, :score,
+                    score, comment, created_at)
+                    VALUES (:id, :query_id, :user_id, :score,
                     :comment, :created_at)
                 """
                 )
