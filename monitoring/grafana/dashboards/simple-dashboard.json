@@ -144,6 +144,64 @@
         "y": 16
       }
     }
+    ,
+    {
+      "id": 7,
+      "title": "Feedback Submission Rate",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "sum(increase(feedback_submissions_total[2m])) by (score)",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      }
+    },
+    {
+      "id": 8,
+      "title": "User Satisfaction Rate",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "feedback_satisfaction_rate",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      }
+    },
+    {
+      "id": 9,
+      "title": "Discord Feedback Clicks (last 2m)",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "sum(increase(discord_feedback_clicks_total[2m])) by (type)",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      }
+    }
   ],
   "time": {
     "from": "now-1h",

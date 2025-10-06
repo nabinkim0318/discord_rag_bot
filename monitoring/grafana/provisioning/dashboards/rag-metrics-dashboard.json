@@ -681,34 +681,13 @@
       },
       "targets": [
         {
-          "expr": "sum(rag_query_total) by (endpoint) OR vector(0)",
+          "expr": "sum(rate(http_requests_total{path=~\"/api/.*\"}[5m])) by (method, status)",
           "interval": "",
-          "legendFormat": "{{endpoint}}",
+          "legendFormat": "{{method}} {{status}}",
           "refId": "A"
         }
       ],
-      "title": "HTTP Request Rate (proxy: rag_query_total)",
-      "type": "timeseries"
-    }
-    ,
-    {
-      "datasource": "Prometheus",
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" }
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
-      "id": 10,
-      "options": {
-        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "single" }
-      },
-      "targets": [
-        { "expr": "sum(increase(feedback_submissions_total[5m]))", "refId": "A", "legendFormat": "feedback submissions" }
-      ],
-      "title": "Satisfaction Trend (Submissions over 5m)",
+      "title": "HTTP Request Rate by Method and Status",
       "type": "timeseries"
     }
   ],
