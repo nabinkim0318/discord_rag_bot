@@ -10,7 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.logging import logger
-from app.core.metrics import feedback_submissions
+from app.core.metrics import feedback_satisfaction_rate, feedback_submissions
 from app.db.session import engine
 
 
@@ -95,6 +95,40 @@ class FeedbackService:
 
             # Record metrics
             feedback_submissions.labels(score=score).inc()
+
+            # Update satisfaction gauge (up / total)
+            try:
+                with self.engine.connect() as conn:
+                    total = (
+                        conn.execute(text("SELECT COUNT(*) FROM feedback")).scalar()
+                        or 0
+                    )
+                    up_ct = conn.execute(
+                        text("SELECT COUNT(*) FROM feedback WHERE ").columns()
+                    ).scalar()
+            except Exception:
+                total = 0
+                up_ct = 0
+            try:
+                # If schema uses score column
+                with self.engine.connect() as conn:
+                    up_ct = (
+                        conn.execute(
+                            text("SELECT COUNT(*) FROM feedback WHERE score = 'up'")
+                        ).scalar()
+                        or 0
+                    )
+                    total = (
+                        conn.execute(text("SELECT COUNT(*) FROM feedback")).scalar()
+                        or 0
+                    )
+            except Exception:
+                pass
+            try:
+                rate = (up_ct / total) if total > 0 else 0.0
+                feedback_satisfaction_rate.set(rate)
+            except Exception:
+                pass
 
             return True, "Feedback submitted successfully"
 

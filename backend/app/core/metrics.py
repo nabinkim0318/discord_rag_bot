@@ -147,6 +147,14 @@ def rag_query_metric(info):
         rag_query_counter.labels(method=method, endpoint=path).inc()
         rag_query_latency.labels(endpoint=path).observe(duration)
 
+    # Record generic API request counts for visibility across endpoints
+    try:
+        if isinstance(path, str) and path.startswith("/api/"):
+            rag_requests_total.labels(endpoint=path).inc()
+    except Exception:
+        # Avoid breaking the request on metrics errors
+        pass
+
 
 def record_feedback_metric(feedback_type: str):
     """Record feedback metric"""
