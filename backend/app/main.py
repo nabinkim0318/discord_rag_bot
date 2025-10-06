@@ -1,6 +1,8 @@
 # app/main.py
+from contextlib import asynccontextmanager
 from pathlib import Path
 from time import time
+from typing import AsyncGenerator
 from uuid import uuid4
 
 from dotenv import load_dotenv
@@ -29,10 +31,27 @@ if env_path.exists():
 # Logging
 logger.info("App starting...")
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Application lifespan manager"""
+    # Startup
+    logger.info("Application startup - creating database tables")
+    SQLModel.metadata.create_all(engine)
+    logger.info("Database tables created successfully")
+
+    yield
+
+    # Shutdown
+    logger.info("Application shutdown - dropping database tables")
+    logger.info("Database tables dropped successfully")
+
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description="FastAPI backend for Discord RAG Bot",
+    lifespan=lifespan,
 )
 
 # Setup error handlers
@@ -66,19 +85,6 @@ app.include_router(health.health_router, prefix="/api/v1/health", tags=["Health"
 # Metrics - properly configure instrumentator
 if settings.METRICS_ENABLED:
     instrumentator.instrument(app).expose(app, endpoint=settings.METRICS_PATH)
-
-
-@app.on_event("startup")
-def on_startup():
-    logger.info("Application startup - creating database tables")
-    SQLModel.metadata.create_all(engine)
-    logger.info("Database tables created successfully")
-
-
-@app.on_event("shutdown")
-def on_shutdown():
-    logger.info("Application shutdown - dropping database tables")
-    logger.info("Database tables dropped successfully")
 
 
 @app.middleware("http")
