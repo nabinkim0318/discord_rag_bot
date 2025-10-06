@@ -1,0 +1,44 @@
+{
+  "evaluation_timestamp": "2025-10-06T14:49:40.115963",
+  "total_cases": 100,
+  "successful_cases": 97,
+  "success_rate": 0.97,
+  "final_metrics": {
+    "precision_at_10": 0.161,
+    "recall_at_10": 0.97,
+    "ndcg_at_10": 0.375,
+    "mrr_at_10": 0.194,
+    "hit_rate": 0.97,
+    "avg_latency_ms": 537.4
+  },
+  "optimal_parameters": {
+    "k_bm25": 50,
+    "k_vec": 50,
+    "k_final": 10,
+    "bm25_weight": 0.2,
+    "vec_weight": 0.8,
+    "preselect_topn": 30,
+    "per_doc_cap": 2,
+    "use_rerank": true,
+    "use_mmr": false,
+    "rrf_c": 15
+  },
+  "thresholds": {
+    "ndcg_threshold": 0.3,
+    "hit_rate_threshold": 0.5,
+    "latency_threshold_ms": 1000.0
+  },
+  "evaluation_passed": true,
+  "key_improvements": [
+    "Fixed chunk_uid format mismatches in gold dataset (95 UIDs corrected)",
+    "Implemented Cross-Encoder reranker for improved ranking",
+    "Optimized preselect_topn=30 and per_doc_cap=2 parameters",
+    "Applied score-based fusion with z-score normalization",
+    "Integrated Protected-Top logic for seed preservation"
+  ],
+  "failed_cases": [
+    "bc_0004: In which week is the final demo scheduled?",
+    "bc_0032: What are the criteria for Tier 2 (AI Innovator) award?",
+    "bc_0065: Are there specific tools suggested for API documentation?"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "total": 49,
+  "p_at_k_mean": 0.153061224489796,
+  "r_at_k_mean": 0.9183673469387755,
+  "ndcg_at_k_mean": 0.40114684285242397,
+  "mrr_at_k_mean": 0.24149659863945566,
+  "map_at_k_mean": 0.24149659863945566,
+  "avg_latency_ms": 484.6530612244898,
+  "hit_rate": 0.9183673469387755,
+  "ndcg_threshold": 0.3,
+  "passed": true,
+  "failure_reason": null
+}

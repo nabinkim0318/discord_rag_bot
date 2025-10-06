@@ -1,0 +1,13 @@
+{
+  "total": 49,
+  "p_at_k_mean": 0.0,
+  "r_at_k_mean": 0.0,
+  "ndcg_at_k_mean": 0.0,
+  "mrr_at_k_mean": 0.0,
+  "map_at_k_mean": 0.0,
+  "avg_latency_ms": 499.85714285714283,
+  "hit_rate": 0.0,
+  "ndcg_threshold": 0.3,
+  "passed": false,
+  "failure_reason": "nDCG 0.000 < threshold 0.3; Hit rate 0.000 < threshold 0.5"
+}

@@ -1,6 +1,14 @@
 {
-  "rag_evaluation_accuracy": 1.0,
-  "rag_evaluation_avg_response_time": 9.5367431640625e-7,
-  "rag_evaluation_total_cases": 5,
-  "rag_evaluation_prompt_version": "v1.1"
+  "rag_eval_total": 49,
+  "rag_eval_p_at_k": 0.153061224489796,
+  "rag_eval_r_at_k": 0.9183673469387755,
+  "rag_eval_ndcg_at_k": 0.40114684285242397,
+  "rag_eval_mrr_at_k": 0.24149659863945566,
+  "rag_eval_map_at_k": 0.24149659863945566,
+  "rag_eval_hit_rate": 0.9183673469387755,
+  "rag_eval_avg_latency_ms": 484.6530612244898,
+  "rag_eval_ndcg_threshold": 0.3,
+  "rag_eval_passed": true,
+  "rag_eval_failure_reason": null,
+  "rag_eval_status": "PASS"
 }
