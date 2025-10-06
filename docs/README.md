@@ -7,6 +7,7 @@
 - Contributing: `CONTRIBUTING.md`
 - Observability: `observability.md`
 - Test Structure: `TEST_STRUCTURE.md`
+- Ops configs: `../ops/` (Prometheus, Grafana, Compose)
 
 ## Roles & Responsibilities
 
