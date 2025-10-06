@@ -103,7 +103,7 @@ def load_pdf_to_pages(
             section_title=section_map.get(page_num),
             url=default_url,  # usually not present but included in schema
             checksum=checksum,
-            ingested_at=datetime.utcnow(),
+            ingested_at=datetime.now(datetime.UTC),
             extra={},  # additional fields per document (if needed)
         )
         records.append(PageRecord(text=text, meta=meta))

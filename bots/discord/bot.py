@@ -26,6 +26,7 @@ from interactions import (  # events,  # optional for future global listeners
     slash_command,
     slash_option,
 )
+from prometheus_client import Counter, Summary, start_http_server
 
 # from interactions.api.http import Forbidden  # Commented out due to version compatibility
 # from metrics import RAG_FAILURES, RAG_LATENCY, RAG_TOTAL  # Commented out due to missing module
@@ -60,6 +61,7 @@ DISCORD_TOKEN = os.environ.get("DISCORD_BOT_TOKEN")
 if not DISCORD_TOKEN:
     raise RuntimeError("DISCORD_BOT_TOKEN is not set. Check your .env")
 DISCORD_APP_ID = os.environ.get("DISCORD_CLIENT_ID")
+BOT_METRICS_PORT = int(os.environ.get("BOT_METRICS_PORT", "9109"))
 
 
 async def call_backend_query(
@@ -115,6 +117,34 @@ if GUILD_ID:
 else:
     BOT = interactions.Client(token=DISCORD_TOKEN)
 logger.info(f"Bot initialized with guild ID: {GUILD_ID if GUILD_ID else 'None'}")
+
+
+# ---- Prometheus metrics ----
+SLASH_INVOCATIONS = Counter(
+    "discord_slash_invocations_total",
+    "Total slash command invocations",
+    labelnames=("command",),
+)
+FEEDBACK_CLICKS = Counter(
+    "discord_feedback_clicks_total",
+    "Total feedback button clicks",
+    labelnames=("type",),
+)
+COMMAND_ERRORS = Counter(
+    "discord_command_errors_total",
+    "Total command processing errors",
+    labelnames=("stage",),
+)
+ASK_LATENCY = Summary(
+    "discord_ask_latency_seconds",
+    "Latency of /ask end-to-end within bot (client side)",
+)
+
+try:
+    start_http_server(BOT_METRICS_PORT)
+    logger.info(f"✅ Bot metrics exporter started on :{BOT_METRICS_PORT}")
+except Exception as e:
+    logger.warning(f"Failed to start metrics exporter: {e}")
 
 
 async def clear_global_commands():
@@ -230,6 +260,7 @@ async def ping(ctx: SlashContext):
 )
 async def ask(ctx: SlashContext, question: str, private: bool = False):
     await ctx.defer()
+    SLASH_INVOCATIONS.labels(command="ask").inc()
 
     start = time.perf_counter()
 
@@ -283,10 +314,12 @@ async def ask(ctx: SlashContext, question: str, private: bool = False):
             logger.warning("Could not store message→query mapping")
 
         # discord_message_id = getattr(sent, "id", None)
+        ASK_LATENCY.observe(time.perf_counter() - start)
         # RAG_TOTAL.inc()  # Commented out due to missing metrics module
         # RAG_LATENCY.observe(latency / 1000.0)  # Commented out due to missing metrics module
 
     except httpx.HTTPError as e:
+        COMMAND_ERRORS.labels(stage="ask_http").inc()
         # RAG_TOTAL.inc()  # Commented out due to missing metrics module
         # RAG_FAILURES.inc()  # Commented out due to missing metrics module
         # fail latency also aggregate (meaningful)
@@ -300,6 +333,7 @@ async def ask(ctx: SlashContext, question: str, private: bool = False):
         )
 
     except Exception as e:
+        COMMAND_ERRORS.labels(stage="ask_unexpected").inc()
         # RAG_TOTAL.inc()  # Commented out due to missing metrics module
         # RAG_FAILURES.inc()  # Commented out due to missing metrics module
         # RAG_LATENCY.observe((time.perf_counter() - start) / 1000.0)  # Commented out due to missing metrics module
@@ -316,6 +350,7 @@ async def ask(ctx: SlashContext, question: str, private: bool = False):
 async def on_fb_up(ctx: ComponentContext):
     try:
         await ctx.defer(ephemeral=True)
+        FEEDBACK_CLICKS.labels(type="up").inc()
         msg_id = int(getattr(ctx.message, "id", 0) or 0)
         query_id = MESSAGE_QID.get(msg_id)
         if not query_id:
@@ -336,6 +371,7 @@ async def on_fb_up(ctx: ComponentContext):
         logger.info("Backend feedback call successful (up)")
         await ctx.send("Thanks for the feedback 👍", flags=MessageFlags.EPHEMERAL)
     except httpx.HTTPError as e:
+        COMMAND_ERRORS.labels(stage="fb_up_http").inc()
         status = getattr(getattr(e, "response", None), "status_code", None)
         text = None
         try:
@@ -362,6 +398,7 @@ async def on_fb_up(ctx: ComponentContext):
                 flags=MessageFlags.EPHEMERAL,
             )
     except Exception as e:
+        COMMAND_ERRORS.labels(stage="fb_up_unexpected").inc()
         logger.error(f"Unexpected error in feedback processing (up): {e}")
         await ctx.send(
             "An error occurred while processing your feedback.",
@@ -373,6 +410,7 @@ async def on_fb_up(ctx: ComponentContext):
 async def on_fb_down(ctx: ComponentContext):
     try:
         await ctx.defer(ephemeral=True)
+        FEEDBACK_CLICKS.labels(type="down").inc()
         msg_id = int(getattr(ctx.message, "id", 0) or 0)
         query_id = MESSAGE_QID.get(msg_id)
         if not query_id:
@@ -393,6 +431,7 @@ async def on_fb_down(ctx: ComponentContext):
         logger.info("Backend feedback call successful (down)")
         await ctx.send("Thanks for the feedback 👎", flags=MessageFlags.EPHEMERAL)
     except httpx.HTTPError as e:
+        COMMAND_ERRORS.labels(stage="fb_down_http").inc()
         status = getattr(getattr(e, "response", None), "status_code", None)
         text = None
         try:
@@ -419,6 +458,7 @@ async def on_fb_down(ctx: ComponentContext):
                 flags=MessageFlags.EPHEMERAL,
             )
     except Exception as e:
+        COMMAND_ERRORS.labels(stage="fb_down_unexpected").inc()
         logger.error(f"Unexpected error in feedback processing (down): {e}")
         await ctx.send(
             "An error occurred while processing your feedback.",
@@ -430,6 +470,7 @@ async def on_fb_down(ctx: ComponentContext):
 async def on_fb_regen(ctx: ComponentContext):
     try:
         await ctx.defer(ephemeral=True)
+        SLASH_INVOCATIONS.labels(command="regen").inc()
         msg_id = int(getattr(ctx.message, "id", 0) or 0)
         question = MESSAGE_QUESTION.get(msg_id)
         if not question:
@@ -457,12 +498,14 @@ async def on_fb_regen(ctx: ComponentContext):
         except Exception:
             logger.warning("Could not store message→query mapping for regen")
     except httpx.HTTPError as e:
+        COMMAND_ERRORS.labels(stage="regen_http").inc()
         logger.error(f"HTTP error in regenerate: {e}")
         await ctx.send(
             "Backend is not responding. Please try again later.",
             flags=MessageFlags.EPHEMERAL,
         )
     except Exception as e:
+        COMMAND_ERRORS.labels(stage="regen_unexpected").inc()
         logger.error(f"Unexpected error in regenerate: {e}")
         await ctx.send(
             "An error occurred while regenerating the answer.",

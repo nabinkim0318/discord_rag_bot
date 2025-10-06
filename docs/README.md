@@ -247,8 +247,10 @@ cd bots && python run_bot.py
 ### Testing
 
 ```bash
-# Run tests
-pytest backend/tests/
+# Run tests (local development)
+export WEAVIATE_URL=http://localhost:8080
+cd backend
+pytest -q
 
 # Test feedback service
 python scripts/test_feedback.py
@@ -259,6 +261,8 @@ python scripts/smoke_retrieval.py
 # Check environment variables
 make env-check
 ```
+
+**Note**: For local testing, set `WEAVIATE_URL=http://localhost:8080` to connect to the Docker Weaviate instance.
 
 ### Code Quality
 

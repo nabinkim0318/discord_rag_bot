@@ -86,7 +86,7 @@ class FeedbackService:
                         "user_id": user_id,
                         "score": score,
                         "comment": comment,
-                        "created_at": datetime.utcnow(),
+                        "created_at": datetime.now(datetime.UTC),
                     },
                 )
                 conn.commit()
