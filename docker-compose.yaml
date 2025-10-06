@@ -17,6 +17,7 @@ services:
       DEFAULT_VECTORIZER_MODULE: "text2vec-openai"
       ENABLE_MODULES: "text2vec-openai"
       OPENAI_APIKEY: "${OPENAI_API_KEY}"
+      PROMETHEUS_MONITORING_ENABLED: "true"
     volumes:
       - weaviate_data:/var/lib/weaviate
     networks:
@@ -152,7 +153,7 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin123
       - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/simple-dashboard.json
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/rag-metrics-dashboard.json
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning

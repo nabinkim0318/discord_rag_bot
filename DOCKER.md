@@ -153,7 +153,10 @@ curl http://localhost:9090/api/v1/status/config
 ### Prometheus Metrics
 
 - **URL**: <http://localhost:9090>
-- **Metrics Endpoint**: <http://localhost:8001/metrics>
+- **Metrics Endpoints**:
+  - Backend: <http://localhost:8001/metrics>
+  - Discord bot: <http://localhost:9109/metrics>
+  - Weaviate: <http://localhost:8080/v1/metrics> (set `PROMETHEUS_MONITORING_ENABLED=true`)
 - **Key Metrics**: RAG latency, retrieval hit rate, error rates
 
 ### Grafana Dashboards
