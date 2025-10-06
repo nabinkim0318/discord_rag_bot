@@ -3,13 +3,19 @@
 Discord bot execution script
 """
 import asyncio
+import logging
 import os
 import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
 from interactions import Client, Intents
-from rag_agent.core.logging import logger
+
+# Set up basic logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 # add project root to Python path
 project_root = Path(__file__).parent.parent

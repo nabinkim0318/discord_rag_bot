@@ -2,8 +2,7 @@
 FROM python:3.11-slim as builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    POETRY_VERSION=1.8.3
+    PYTHONUNBUFFERED=1
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -13,18 +12,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install Poetry
-RUN pip install --no-cache-dir poetry==${POETRY_VERSION}
-
-# Configure Poetry
-RUN poetry config virtualenvs.create false \
-    && poetry config installer.parallel false
-
 # Copy dependency files
-COPY pyproject.toml poetry.lock* ./
+COPY discord/requirements.txt ./
 
-# Install dependencies (production only)
-RUN poetry install --only=main --no-interaction --no-ansi --no-root
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
 # ==================== Runtime Stage ====================
 FROM python:3.11-slim as runtime
@@ -52,9 +44,11 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy application code
 COPY --chown=botuser:botuser . .
 
-# Copy environment validation script
-COPY --chown=botuser:botuser ../backend/scripts/validate_env.py /usr/local/bin/validate_env.py
-RUN chmod +x /usr/local/bin/validate_env.py
+# Copy environment validation script (create a simple one if not available)
+RUN printf '#!/usr/bin/env python3\nimport os\nimport sys\n\nrequired_vars = ["DISCORD_BOT_TOKEN"]\nmissing = []\nfor var in required_vars:\n    if not os.getenv(var):\n        missing.append(var)\n\nif missing:\n    print(f"❌ Missing environment variables: {missing}")\n    sys.exit(1)\nelse:\n    print("✅ Environment variables validated")\n' > /usr/local/bin/validate_env.py && chmod +x /usr/local/bin/validate_env.py
+
+# Create startup script as root before switching user
+RUN printf '#!/bin/bash\nset -e\necho "🔍 Validating environment variables..."\npython /usr/local/bin/validate_env.py\necho "🤖 Starting Discord bot..."\nexec python run_bot.py' > /app/start.sh && chmod +x /app/start.sh && chown botuser:botuser /app/start.sh
 
 # Switch to non-root user
 USER botuser
@@ -62,9 +56,6 @@ USER botuser
 # Health check (simple process check)
 HEALTHCHECK --interval=60s --timeout=10s --start-period=10s --retries=3 \
     CMD pgrep -f "python.*run_bot.py" || exit 1
-
-# Create startup script
-RUN printf '#!/bin/bash\nset -e\necho "🔍 Validating environment variables..."\npython /usr/local/bin/validate_env.py\necho "🤖 Starting Discord bot..."\nexec python run_bot.py' > /app/start.sh && chmod +x /app/start.sh
 
 # Start application
 CMD ["/app/start.sh"]
