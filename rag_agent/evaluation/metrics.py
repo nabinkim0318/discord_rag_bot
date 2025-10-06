@@ -8,15 +8,15 @@ from typing import List, Sequence, Set
 
 
 def precision_at_k(ranked_uids: Sequence[str], relevant: Set[str], k: int) -> float:
-    if k <= 0:
+    if k <= 0 or not ranked_uids:
         return 0.0
     k = min(k, len(ranked_uids))
     hit = sum(1 for uid in ranked_uids[:k] if uid in relevant)
-    return hit / k
+    return hit / k if k > 0 else 0.0
 
 
 def recall_at_k(ranked_uids: Sequence[str], relevant: Set[str], k: int) -> float:
-    if not relevant:
+    if not relevant or not ranked_uids:
         return 0.0
     k = min(k, len(ranked_uids))
     hit = sum(1 for uid in ranked_uids[:k] if uid in relevant)
@@ -25,9 +25,11 @@ def recall_at_k(ranked_uids: Sequence[str], relevant: Set[str], k: int) -> float
 
 def ap_at_k(ranked_uids: Sequence[str], relevant: Set[str], k: int) -> float:
     """Average Precision@k"""
-    if not relevant:
+    if not relevant or not ranked_uids:
         return 0.0
     k = min(k, len(ranked_uids))
+    if k <= 0:
+        return 0.0
     score = 0.0
     hit = 0
     for i in range(k):
@@ -47,6 +49,8 @@ def map_at_k(
 
 
 def mrr_at_k(ranked_uids: Sequence[str], relevant: Set[str], k: int) -> float:
+    if not ranked_uids:
+        return 0.0
     k = min(k, len(ranked_uids))
     for i in range(k):
         if ranked_uids[i] in relevant:
@@ -63,6 +67,8 @@ def dcg_at_k(gains: Sequence[int], k: int) -> float:
 
 
 def ndcg_at_k(ranked_uids: Sequence[str], relevant: Set[str], k: int) -> float:
+    if not ranked_uids:
+        return 0.0
     gains = [1 if uid in relevant else 0 for uid in ranked_uids]
     ideal = sorted(gains, reverse=True)
     dcg = dcg_at_k(gains, k)
