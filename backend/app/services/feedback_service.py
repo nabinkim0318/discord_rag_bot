@@ -3,7 +3,7 @@ Feedback service for handling user feedback on RAG responses
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import text
@@ -86,7 +86,7 @@ class FeedbackService:
                         "user_id": user_id,
                         "score": score,
                         "comment": comment,
-                        "created_at": datetime.now(datetime.UTC),
+                        "created_at": datetime.now(timezone.utc),
                     },
                 )
                 conn.commit()
@@ -103,27 +103,25 @@ class FeedbackService:
                         conn.execute(text("SELECT COUNT(*) FROM feedback")).scalar()
                         or 0
                     )
-                    up_ct = conn.execute(
-                        text("SELECT COUNT(*) FROM feedback WHERE ").columns()
-                    ).scalar()
+                    if has_score_column:
+                        up_ct = (
+                            conn.execute(
+                                text("SELECT COUNT(*) FROM feedback WHERE score = 'up'")
+                            ).scalar()
+                            or 0
+                        )
+                    else:
+                        up_ct = (
+                            conn.execute(
+                                text(
+                                    "SELECT COUNT(*) FROM feedback WHERE feedback = 'up'"
+                                )
+                            ).scalar()
+                            or 0
+                        )
             except Exception:
                 total = 0
                 up_ct = 0
-            try:
-                # If schema uses score column
-                with self.engine.connect() as conn:
-                    up_ct = (
-                        conn.execute(
-                            text("SELECT COUNT(*) FROM feedback WHERE score = 'up'")
-                        ).scalar()
-                        or 0
-                    )
-                    total = (
-                        conn.execute(text("SELECT COUNT(*) FROM feedback")).scalar()
-                        or 0
-                    )
-            except Exception:
-                pass
             try:
                 rate = (up_ct / total) if total > 0 else 0.0
                 feedback_satisfaction_rate.set(rate)

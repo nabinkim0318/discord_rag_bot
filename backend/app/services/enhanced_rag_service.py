@@ -11,13 +11,17 @@ from app.core.metrics import record_rag_request
 
 # Try to import rag_agent components
 try:
-    from rag_agent.generation.generation_pipeline import rag_generate_answer
+    from rag_agent.generation.generation_pipeline import generate_answer
 
     RAG_AGENT_AVAILABLE = True
     logger.info("Enhanced RAG: rag_agent available")
 except ImportError as e:
     logger.warning(f"Enhanced RAG: rag_agent not available: {e}")
     RAG_AGENT_AVAILABLE = False
+
+    # Create a dummy function for testing
+    def generate_answer(*args, **kwargs):
+        raise ImportError("RAG agent not available")
 
 
 def run_enhanced_rag_pipeline(
@@ -52,7 +56,7 @@ def run_enhanced_rag_pipeline(
         if RAG_AGENT_AVAILABLE:
             try:
                 # Use actual RAG pipeline
-                answer, contexts, metadata = rag_generate_answer(
+                answer, contexts, metadata = generate_answer(
                     query=query,
                     k_final=top_k,
                     k_bm25=30,
@@ -74,6 +78,7 @@ def run_enhanced_rag_pipeline(
                     "request_id": request_id,
                     "pipeline": "enhanced_rag",
                     "rag_agent_available": True,
+                    "enhanced_rag": True,
                     **metadata,
                 }
 
@@ -85,7 +90,23 @@ def run_enhanced_rag_pipeline(
 
             except Exception as e:
                 logger.error(f"Enhanced RAG pipeline failed: {e}")
-                raise
+                # Fallback to simple response when RAG agent fails
+                logger.warning("Enhanced RAG: RAG agent failed, using fallback")
+                answer = f"Enhanced RAG failed. Query: {query}"
+                contexts = []
+                metadata = {
+                    "total_time": time.time() - start_time,
+                    "user_id": user_id,
+                    "channel_id": channel_id,
+                    "request_id": request_id,
+                    "pipeline": "enhanced_rag_fallback",
+                    "rag_agent_available": True,
+                    "rag_agent_failed": True,
+                    "enhanced_rag": True,
+                    "error": str(e),
+                }
+
+                return answer, contexts, metadata
 
         else:
             # Fallback to simple response

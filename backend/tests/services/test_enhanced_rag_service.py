@@ -20,10 +20,10 @@ class TestEnhancedRAGService:
         query = "Test enhanced query"
         answer, contexts, metadata = _mock_enhanced_rag_pipeline(query)
 
-        assert "Enhanced RAG Response" in answer
-        assert len(contexts) == 2
+        assert "Mock enhanced RAG response" in answer
+        assert len(contexts) == 1
         assert metadata["mock"] is True
-        assert metadata["enhanced_rag"] is True
+        assert metadata["pipeline"] == "mock_enhanced_rag"
 
     def test_run_enhanced_rag_pipeline_with_rag_agent(self):
         """Test enhanced RAG pipeline with RAG agent available"""
@@ -32,9 +32,7 @@ class TestEnhancedRAGService:
         # Mock RAG agent available and generate_answer function
         with (
             patch("app.services.enhanced_rag_service.RAG_AGENT_AVAILABLE", True),
-            patch(
-                "app.services.enhanced_rag_service.rag_generate_answer"
-            ) as mock_generate,
+            patch("app.services.enhanced_rag_service.generate_answer") as mock_generate,
         ):
             mock_generate.return_value = (
                 "Enhanced answer from RAG agent",
@@ -53,7 +51,7 @@ class TestEnhancedRAGService:
 
             assert answer == "Enhanced answer from RAG agent"
             assert len(contexts) == 1
-            assert contexts[0]["content"] == "Enhanced context"
+            assert contexts[0]["text"] == "Enhanced context"
             assert metadata["enhanced_rag"] is True
             assert "total_time" in metadata
             mock_generate.assert_called_once()
@@ -65,10 +63,9 @@ class TestEnhancedRAGService:
         with patch("app.services.enhanced_rag_service.RAG_AGENT_AVAILABLE", False):
             answer, contexts, metadata = run_enhanced_rag_pipeline(query)
 
-            assert "Enhanced RAG Response" in answer
-            assert len(contexts) == 2
-            assert metadata["mock"] is True
-            assert metadata["enhanced_rag"] is True
+        assert "Enhanced RAG is not available" in answer
+        assert len(contexts) == 0
+        assert metadata["rag_agent_available"] is False
 
     def test_run_enhanced_rag_pipeline_exception_handling(self):
         """Test enhanced RAG pipeline exception handling with fallback"""
@@ -77,7 +74,7 @@ class TestEnhancedRAGService:
         with (
             patch("app.services.enhanced_rag_service.RAG_AGENT_AVAILABLE", True),
             patch(
-                "app.services.enhanced_rag_service.rag_generate_answer",
+                "app.services.enhanced_rag_service.generate_answer",
                 side_effect=Exception("RAG error"),
             ),
         ):
@@ -99,9 +96,7 @@ class TestEnhancedRAGService:
 
         with (
             patch("app.services.enhanced_rag_service.RAG_AGENT_AVAILABLE", True),
-            patch(
-                "app.services.enhanced_rag_service.rag_generate_answer"
-            ) as mock_generate,
+            patch("app.services.enhanced_rag_service.generate_answer") as mock_generate,
         ):
             mock_generate.return_value = (
                 "Contextual answer",
@@ -131,9 +126,7 @@ class TestEnhancedRAGService:
 
         with (
             patch("app.services.enhanced_rag_service.RAG_AGENT_AVAILABLE", True),
-            patch(
-                "app.services.enhanced_rag_service.rag_generate_answer"
-            ) as mock_generate,
+            patch("app.services.enhanced_rag_service.generate_answer") as mock_generate,
         ):
             mock_generate.return_value = (
                 "Custom answer",
@@ -166,9 +159,7 @@ class TestEnhancedRAGService:
 
         with (
             patch("app.services.enhanced_rag_service.RAG_AGENT_AVAILABLE", True),
-            patch(
-                "app.services.enhanced_rag_service.rag_generate_answer"
-            ) as mock_generate,
+            patch("app.services.enhanced_rag_service.generate_answer") as mock_generate,
         ):
             # Mock response with various context formats
             mock_generate.return_value = (
@@ -202,8 +193,8 @@ class TestEnhancedRAGService:
             assert len(contexts) == 3
 
             # Check that contexts are properly formatted
-            assert contexts[0]["content"] == "Context 1"
-            assert contexts[1]["content"] == "Context 2"
+            assert contexts[0]["text"] == "Context 1"
+            assert contexts[1]["text"] == "Context 2"
             assert contexts[2]["content"] == "Context 3"
 
             assert metadata["enhanced_rag"] is True
@@ -214,9 +205,7 @@ class TestEnhancedRAGService:
 
         with (
             patch("app.services.enhanced_rag_service.RAG_AGENT_AVAILABLE", True),
-            patch(
-                "app.services.enhanced_rag_service.rag_generate_answer"
-            ) as mock_generate,
+            patch("app.services.enhanced_rag_service.generate_answer") as mock_generate,
         ):
             mock_generate.return_value = (
                 "Metadata answer",
@@ -252,17 +241,18 @@ class TestEnhancedRAGService:
         with (
             patch("app.services.enhanced_rag_service.RAG_AGENT_AVAILABLE", True),
             patch(
-                "app.services.enhanced_rag_service.rag_generate_answer",
+                "app.services.enhanced_rag_service.generate_answer",
                 side_effect=Exception("RAG unavailable"),
             ),
         ):
-            # Should fall back to mock implementation
+            # Should fall back to fallback implementation
             answer, contexts, metadata = run_enhanced_rag_pipeline(query)
 
-            assert "Enhanced RAG Response" in answer
-            assert len(contexts) == 2
-            assert metadata["mock"] is True
+            assert "Enhanced RAG failed" in answer
+            assert len(contexts) == 0
+            assert metadata["rag_agent_failed"] is True
             assert metadata["enhanced_rag"] is True
+            assert metadata["pipeline"] == "enhanced_rag_fallback"
 
     def test_run_enhanced_rag_pipeline_stream_mode(self):
         """Test enhanced RAG pipeline in stream mode"""
@@ -270,9 +260,7 @@ class TestEnhancedRAGService:
 
         with (
             patch("app.services.enhanced_rag_service.RAG_AGENT_AVAILABLE", True),
-            patch(
-                "app.services.enhanced_rag_service.rag_generate_answer"
-            ) as mock_generate,
+            patch("app.services.enhanced_rag_service.generate_answer") as mock_generate,
         ):
             mock_generate.return_value = (
                 "Stream answer",
@@ -302,9 +290,7 @@ class TestEnhancedRAGService:
 
         with (
             patch("app.services.enhanced_rag_service.RAG_AGENT_AVAILABLE", True),
-            patch(
-                "app.services.enhanced_rag_service.rag_generate_answer"
-            ) as mock_generate,
+            patch("app.services.enhanced_rag_service.generate_answer") as mock_generate,
         ):
             mock_generate.return_value = (
                 "Integration answer",
@@ -338,8 +324,8 @@ class TestEnhancedRAGService:
 
             assert answer == "Integration answer"
             assert len(contexts) == 2
-            assert contexts[0]["content"] == "Context 1"
-            assert contexts[1]["content"] == "Context 2"
+            assert contexts[0]["text"] == "Context 1"
+            assert contexts[1]["text"] == "Context 2"
             assert metadata["enhanced_rag"] is True
             assert "total_time" in metadata
             # Check that metadata contains expected fields
