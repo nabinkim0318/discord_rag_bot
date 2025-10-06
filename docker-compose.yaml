@@ -131,7 +131,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -156,7 +156,7 @@ services:
       - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/rag-metrics-dashboard.json
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning
     networks:
       - app_net
       - monitoring
