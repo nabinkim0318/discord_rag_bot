@@ -79,7 +79,9 @@ def ensure_schema():
         }
         c.schema.create_class(class_schema)
     finally:
-        c.close()
+        # c.close() # Weaviate client v3.x doesn't have close() method
+        pass
+        pass
 
 
 def uuid_from_chunk_uid(chunk_uid: str) -> str:
@@ -133,7 +135,8 @@ def safe_upsert_single_chunk(
         logger.warning(f"Safe upsert failed for chunk_uid {cu}: {e}")
         return False
     finally:
-        c.close()
+        # c.close() # Weaviate client v3.x doesn't have close() method
+        pass
 
 
 def delete_chunks_by_doc_id(doc_id: str) -> int:
@@ -153,7 +156,8 @@ def delete_chunks_by_doc_id(doc_id: str) -> int:
         logger.warning(f"Delete by doc_id failed for {doc_id}: {e}")
         return 0
     finally:
-        c.close()
+        # c.close() # Weaviate client v3.x doesn't have close() method
+        pass
 
 
 def upsert_chunks_with_vectors(
@@ -227,7 +231,8 @@ def upsert_chunks_with_vectors(
                     # consider re-upsert strategy if needed.
                     cnt += 1
     finally:
-        c.close()
+        # c.close() # Weaviate client v3.x doesn't have close() method
+        pass
     return cnt
 
 
@@ -283,7 +288,8 @@ def bulk_upsert_by_doc_id(
                     )
                     total_upserted += 1
         finally:
-            c.close()
+            # c.close() # Weaviate client v3.x doesn't have close() method
+            pass
 
     return total_upserted
 
@@ -296,7 +302,8 @@ def get_count() -> int:
         res = q.do()
         return int(res["data"]["Aggregate"][CLASS_NAME][0]["meta"]["count"])
     finally:
-        c.close()
+        # c.close() # Weaviate client v3.x doesn't have close() method
+        pass
 
 
 def fetch_by_chunk_uid(chunk_uids: List[str]) -> Dict[str, Dict[str, Any]]:
@@ -317,5 +324,6 @@ def fetch_by_chunk_uid(chunk_uids: List[str]) -> Dict[str, Dict[str, Any]]:
                 props = obj.get("properties") or {}
                 out[cu] = props
     finally:
-        c.close()
+        # c.close() # Weaviate client v3.x doesn't have close() method
+        pass
     return out

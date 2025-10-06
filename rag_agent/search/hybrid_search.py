@@ -183,20 +183,27 @@ def hybrid_retrieve_v2(
         record_latency=False,  # disable metrics for evaluation
     )
 
-    # Convert to legacy format (score -> combined, add bm25/score_vec)
+    # Convert to legacy format (score -> combined, preserve original scores if present)
     converted = []
     for item in results:
+        final_score = (
+            item.get("score_ce")
+            or item.get("score_fused")
+            or item.get("score_rrf")
+            or item.get("score")
+            or 0.0
+        )
         converted_item = {
             "chunk_uid": item["chunk_uid"],
-            "content": item["content"],
+            "content": item.get("content"),
             "source": item.get("source"),
             "doc_id": item.get("doc_id"),
             "chunk_id": item.get("chunk_id"),
             "text": item.get("content"),
             "page": item.get("page"),
-            "combined": item["score"],  # RRF+MMR final score
-            "bm25": 0.0,  # RRF is hard to separate individual scores
-            "score_vec": 0.0,  # RRF is hard to separate individual scores
+            "combined": float(final_score),
+            "bm25": float(item.get("score_bm25", item.get("bm25", 0.0))),
+            "score_vec": float(item.get("score_vec", 0.0)),
         }
         converted.append(converted_item)
 

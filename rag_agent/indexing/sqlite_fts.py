@@ -125,13 +125,32 @@ def _escape_fts5_query(query: str) -> str:
     """
     Escape FTS5 special characters to prevent query injection and syntax errors.
 
-    FTS5 special characters: " ' * ? ^ $ | \\ ( ) [ ] { } + - & | ! ~
+    FTS5 special characters: " ' * ? ^ $ | \\ ( ) [ ] { } + - & | ! ~ . , / :
+    Note: Most special characters cause issues in FTS5, so we remove them instead of escaping
     """
     import re
 
-    # Escape FTS5 special characters
-    special_chars = r'["\'*?^$|\\()\[\]{}+\-&|!~]'
-    escaped = re.sub(special_chars, r"\\\g<0>", query)
+    # Remove ALL problematic characters that cause FTS5 syntax errors
+    # Remove all special characters that can cause syntax errors
+    query_cleaned = query.replace("?", "").replace("(", "").replace(")", "")
+    query_cleaned = query_cleaned.replace("[", "").replace("]", "")
+    query_cleaned = query_cleaned.replace("{", "").replace("}", "")
+    query_cleaned = query_cleaned.replace("*", "").replace("+", "").replace("-", "")
+    query_cleaned = query_cleaned.replace("&", "").replace("|", "").replace("!", "")
+    query_cleaned = query_cleaned.replace("~", "").replace("^", "").replace("$", "")
+    query_cleaned = query_cleaned.replace(".", "")  # Remove . character
+    query_cleaned = query_cleaned.replace(",", "")  # Remove , character
+    query_cleaned = query_cleaned.replace("/", "")  # Remove / character
+    query_cleaned = query_cleaned.replace(":", "")  # Remove : character
+    query_cleaned = query_cleaned.replace(";", "")  # Remove ; character
+    query_cleaned = query_cleaned.replace("@", "")  # Remove @ character
+    query_cleaned = query_cleaned.replace("#", "")  # Remove # character
+    query_cleaned = query_cleaned.replace("%", "")  # Remove % character
+    query_cleaned = query_cleaned.replace("=", "")  # Remove = character
+
+    # Escape remaining special characters
+    special_chars = r'["\'\\]'
+    escaped = re.sub(special_chars, r"\\\g<0>", query_cleaned)
 
     # Additional safety: remove any remaining problematic patterns
     # Remove multiple consecutive spaces and normalize
@@ -221,3 +240,15 @@ def get_by_chunk_uid(db_path: str, chunk_uid: str) -> Optional[Dict[str, Any]]:
             "page": row[6],
             "source": row[7],
         }
+
+
+def uid_exists(db_path: str, chunk_uid: str) -> bool:
+    """
+    Check whether a given chunk_uid exists in the primary table.
+    This validates gold 'relevant_uids' before evaluation to avoid structural misses.
+    """
+    with connect(db_path) as con:
+        cur = con.execute(
+            "SELECT 1 FROM chunks WHERE chunk_uid=? LIMIT 1", (chunk_uid,)
+        )
+        return cur.fetchone() is not None
