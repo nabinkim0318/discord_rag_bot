@@ -6,44 +6,94 @@ from typing import Dict, List
 
 
 def rrf_combine(
-    lists: List[List[Dict]],
-    *,
-    k: int = 60,
+    result_lists: List[List[Dict]],
     score_keys: List[str] | None = None,
     weights: List[float] | None = None,
+    *,
+    c: int = 60,
+    k: int | None = None,  # backward-compat (ignored; use c)
 ) -> List[Dict]:
     """
-    Reciprocal Rank Fusion with optional weights.
-    lists: e.g. [bm25_results, vec_results]
-    score_keys: score key to read from each list element (e.g. ["bm25","score_vec"]);
-    if None, use rank-based only.
-    weights: optional weights for each list (e.g. [0.4, 0.6] for BM25/Vector)
+    Rank-based Reciprocal Rank Fusion (RRF) with weights.
+    - result_lists: [ [ {chunk_uid, score_x}, ...], [ ... ] ]
+    - score_keys:   ["score_bm25", "score_vec"] (keys per list)
+    - weights:      [w1, w2] (defaults to 1.0)
+    Returns list with 'score_rrf' populated and sorted desc.
     """
-    score_keys = score_keys or [None] * len(lists)
-    weights = weights or [1.0] * len(lists)  # default equal weights
-
-    agg: Dict[str, Dict] = {}
-    for L, sk, weight in zip(lists, score_keys, weights):
-        for rank, item in enumerate(L, start=1):
+    weights = weights or [1.0] * len(result_lists)
+    uid2best: Dict[str, Dict] = {}
+    for li, results in enumerate(result_lists):
+        # rank within each list by provided score key (desc)
+        sk = None
+        if score_keys and li < len(score_keys):
+            sk = score_keys[li]
+        ranked = results
+        if sk is not None:
+            try:
+                ranked = sorted(results, key=lambda x: -float(x.get(sk, 0.0)))
+            except Exception:
+                ranked = results[:]
+        for r, item in enumerate(ranked, 1):
             uid = item["chunk_uid"]
-            base = agg.get(uid, {"item": item, "rrf": 0.0})
-            # basic RRF(rank) weighted by list weight
-            rrf = weight * (1.0 / (k + rank))
-            if sk and item.get(sk) is not None:
-                # assume 0~1 score and fine addition (weight is empirical value)
-                # 0.05 is empirical value: corrects vector/keyword score differences
-                # Optimal 0.05 found in offline nDCG@10 experiments
-                # Fine adjustment to rank-based RRF when vector scores are in 0~1 range
-                rrf += 0.05 * weight * float(item[sk])
-            base["rrf"] += rrf
-            agg[uid] = base
-    out = []
-    for uid, pack in agg.items():
-        it = dict(pack["item"])
-        it["score_rrf"] = pack["rrf"]
-        out.append(it)
-    out.sort(key=lambda x: x["score_rrf"], reverse=True)
-    return out
+            contrib = float(weights[li]) / (float(c) + float(r))
+            if uid not in uid2best:
+                uid2best[uid] = {"proto": item.copy(), "score_rrf": 0.0}
+            uid2best[uid]["score_rrf"] += contrib
+    fused: List[Dict] = []
+    for uid, pack in uid2best.items():
+        p = pack["proto"]
+        p["score_rrf"] = pack["score_rrf"]
+        fused.append(p)
+    fused.sort(key=lambda x: -float(x.get("score_rrf", 0.0)))
+    return fused
+
+
+def _zscore(vals: List[float]) -> List[float]:
+    if not vals:
+        return []
+    n = float(len(vals))
+    mu = sum(vals) / n
+    var = sum((v - mu) ** 2 for v in vals) / n
+    sd = (var**0.5) or 1.0
+    return [(v - mu) / sd for v in vals]
+
+
+def score_fuse(
+    bm25_list: List[Dict],
+    vec_list: List[Dict],
+    *,
+    w_bm25: float = 0.2,
+    w_vec: float = 0.8,
+) -> List[Dict]:
+    """
+    Score-based fusion with per-list z-score normalization.
+    Returns fused list sorted by 'score_fused'.
+    """
+    # Collect raw scores
+    bm_scores = [
+        float(it.get("score_bm25", it.get("bm25", 0.0)) or 0.0) for it in bm25_list
+    ]
+    ve_scores = [float(it.get("score_vec", 0.0) or 0.0) for it in vec_list]
+    bm_norm = _zscore(bm_scores) if bm_scores else []
+    ve_norm = _zscore(ve_scores) if ve_scores else []
+
+    uid2 = {}
+    for it, s in zip(bm25_list, bm_norm):
+        uid = it["chunk_uid"]
+        uid2.setdefault(uid, {"proto": it.copy(), "bm": 0.0, "ve": 0.0})
+        uid2[uid]["bm"] = float(s)
+    for it, s in zip(vec_list, ve_norm):
+        uid = it["chunk_uid"]
+        uid2.setdefault(uid, {"proto": it.copy(), "bm": 0.0, "ve": 0.0})
+        uid2[uid]["ve"] = float(s)
+
+    fused: List[Dict] = []
+    for uid, p in uid2.items():
+        d = p["proto"].copy()
+        d["score_fused"] = w_bm25 * p["bm"] + w_vec * p["ve"]
+        fused.append(d)
+    fused.sort(key=lambda x: -float(x.get("score_fused", 0.0)))
+    return fused
 
 
 def cosine_sim(a: List[float], b: List[float]) -> float:
