@@ -114,7 +114,9 @@ def setup_error_handlers(app: FastAPI) -> None:
         request_id = get_request_id(request)
 
         error_response = create_rag_error(
-            message=exc.message, stage=exc.details.get("stage"), request_id=request_id
+            message="RAG service is temporarily unavailable",
+            stage=exc.details.get("stage"),
+            request_id=request_id,
         )
 
         logger.error(
@@ -127,7 +129,11 @@ def setup_error_handlers(app: FastAPI) -> None:
             },
         )
 
-        return JSONResponse(status_code=500, content=error_response.model_dump())
+        return JSONResponse(
+            status_code=503,
+            content=error_response.model_dump(),
+            headers={"Retry-After": "30"},
+        )
 
     @app.exception_handler(DatabaseException)
     async def database_exception_handler(request: Request, exc: DatabaseException):

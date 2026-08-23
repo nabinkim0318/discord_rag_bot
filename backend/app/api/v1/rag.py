@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Request
 
+from app.core.exceptions import ExternalServiceException, RAGException
 from app.core.metrics import record_failure_metric
 from app.models.rag import RAGQueryRequest, RAGQueryResponse
 from app.services.rag_service import run_rag_pipeline
@@ -30,12 +31,25 @@ async def query_rag(request: RAGQueryRequest, http_request: Request):
             "contexts": contexts,
             "metadata": metadata,
         }
-    except Exception as e:
-        record_failure_metric("/api/v1/rag/", "pipeline_error")
-        from app.core.exceptions import RAGException
-
+    except RAGException as exc:
+        record_failure_metric("/api/v1/rag/", exc.error_code)
+        raise
+    except ExternalServiceException as exc:
+        record_failure_metric("/api/v1/rag/", exc.error_code)
+        raise ExternalServiceException(
+            message="RAG dependency is temporarily unavailable",
+            error_code=exc.error_code,
+            service_name=exc.service_name,
+            details={"endpoint": "/api/v1/rag/"},
+        ) from exc
+    except Exception as exc:
+        record_failure_metric("/api/v1/rag/", "RAG_PIPELINE_ERROR")
         raise RAGException(
-            message=f"RAG pipeline failed: {str(e)}",
+            message="RAG service is temporarily unavailable",
             error_code="RAG_PIPELINE_ERROR",
-            details={"stage": "generation", "endpoint": "/api/v1/rag/"},
-        )
+            details={
+                "stage": "generation",
+                "endpoint": "/api/v1/rag/",
+                "exception_type": type(exc).__name__,
+            },
+        ) from exc

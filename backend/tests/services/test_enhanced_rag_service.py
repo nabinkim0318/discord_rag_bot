@@ -5,11 +5,11 @@ Tests for Enhanced RAG service functionality
 from unittest.mock import patch
 
 import pytest
+from rag_mocks import mock_enhanced_rag_pipeline
 
-from app.services.enhanced_rag_service import (
-    _mock_enhanced_rag_pipeline,
-    run_enhanced_rag_pipeline,
-)
+from app.core.exceptions import RAGException
+from app.services import enhanced_rag_service as enhanced_rag_module
+from app.services.enhanced_rag_service import run_enhanced_rag_pipeline
 
 
 class TestEnhancedRAGService:
@@ -18,10 +18,11 @@ class TestEnhancedRAGService:
     def test_mock_enhanced_rag_pipeline(self):
         """Test the mock enhanced RAG pipeline"""
         query = "Test enhanced query"
-        answer, contexts, metadata = _mock_enhanced_rag_pipeline(query)
+        answer, contexts, metadata = mock_enhanced_rag_pipeline(query)
 
         assert "Mock enhanced RAG response" in answer
         assert len(contexts) == 1
+        assert contexts[0] == "Mock context for: Test enhanced query"
         assert metadata["mock"] is True
         assert metadata["pipeline"] == "mock_enhanced_rag"
 
@@ -51,8 +52,10 @@ class TestEnhancedRAGService:
 
             assert answer == "Enhanced answer from RAG agent"
             assert len(contexts) == 1
-            assert contexts[0]["text"] == "Enhanced context"
+            assert contexts[0] == "Enhanced context"
             assert metadata["enhanced_rag"] is True
+            assert metadata["sources"] == ["doc1.pdf"]
+            assert metadata["uids"] == ["id1"]
             assert "total_time" in metadata
             mock_generate.assert_called_once()
 
@@ -61,14 +64,14 @@ class TestEnhancedRAGService:
         query = "Test enhanced query"
 
         with patch("app.services.enhanced_rag_service.RAG_AGENT_AVAILABLE", False):
-            answer, contexts, metadata = run_enhanced_rag_pipeline(query)
+            with pytest.raises(RAGException) as exc_info:
+                run_enhanced_rag_pipeline(query)
 
-        assert "Enhanced RAG is not available" in answer
-        assert len(contexts) == 0
-        assert metadata["rag_agent_available"] is False
+        assert exc_info.value.error_code == "RAG_DEPENDENCY_UNAVAILABLE"
+        assert exc_info.value.details["stage"] == "initialization"
 
     def test_run_enhanced_rag_pipeline_exception_handling(self):
-        """Test enhanced RAG pipeline exception handling with fallback"""
+        """Test enhanced RAG pipeline exception propagation without fallback"""
         query = "Failing query"
 
         with (
@@ -77,15 +80,16 @@ class TestEnhancedRAGService:
                 "app.services.enhanced_rag_service.generate_answer",
                 side_effect=Exception("RAG error"),
             ),
+            patch("app.services.enhanced_rag_service.log_rag_operation") as mock_log,
+            patch("app.services.enhanced_rag_service.record_retrieval_hit") as mock_hit,
         ):
-            # Should not raise exception, should fallback to mock
-            answer, contexts, metadata = run_enhanced_rag_pipeline(query)
+            with pytest.raises(RAGException) as exc_info:
+                run_enhanced_rag_pipeline(query)
 
-            # Verify fallback behavior
-            assert answer is not None
-            assert isinstance(contexts, list)
-            assert isinstance(metadata, dict)
-            assert "enhanced_rag" in metadata
+        assert exc_info.value.error_code == "ENHANCED_RAG_PIPELINE_ERROR"
+        assert "RAG error" not in exc_info.value.message
+        assert mock_log.call_args.args[1] is False
+        mock_hit.assert_not_called()
 
     def test_run_enhanced_rag_pipeline_with_user_context(self):
         """Test enhanced RAG pipeline with user context"""
@@ -192,11 +196,9 @@ class TestEnhancedRAGService:
             assert answer == "Formatted answer"
             assert len(contexts) == 3
 
-            # Check that contexts are properly formatted
-            assert contexts[0]["text"] == "Context 1"
-            assert contexts[1]["text"] == "Context 2"
-            assert contexts[2]["content"] == "Context 3"
-
+            assert contexts == ["Context 1", "Context 2", "Context 3"]
+            assert metadata["sources"] == ["doc1.pdf", "doc2.pdf", "doc3.pdf"]
+            assert metadata["uids"] == ["id1", "id2", "id3"]
             assert metadata["enhanced_rag"] is True
 
     def test_run_enhanced_rag_pipeline_metadata_processing(self):
@@ -227,15 +229,14 @@ class TestEnhancedRAGService:
             answer, contexts, metadata = run_enhanced_rag_pipeline(query)
 
             assert answer == "Metadata answer"
+            assert contexts == ["Metadata context"]
             assert metadata["enhanced_rag"] is True
+            assert metadata["sources"] == ["doc1.pdf"]
+            assert metadata["uids"] == ["id1"]
             assert "total_time" in metadata
-            # Check that metadata contains expected fields
-            assert "enhanced_rag" in metadata
-            assert "total_time" in metadata
-            # Note: uids field may not be present in current implementation
 
-    def test_run_enhanced_rag_pipeline_fallback_to_mock(self):
-        """Test enhanced RAG pipeline fallback to mock when RAG agent fails"""
+    def test_run_enhanced_rag_pipeline_does_not_call_mock_on_failure(self):
+        """Test enhanced RAG pipeline never invokes the test mock on failure"""
         query = "Test fallback"
 
         with (
@@ -245,14 +246,10 @@ class TestEnhancedRAGService:
                 side_effect=Exception("RAG unavailable"),
             ),
         ):
-            # Should fall back to fallback implementation
-            answer, contexts, metadata = run_enhanced_rag_pipeline(query)
+            with pytest.raises(RAGException):
+                run_enhanced_rag_pipeline(query)
 
-            assert "Enhanced RAG failed" in answer
-            assert len(contexts) == 0
-            assert metadata["rag_agent_failed"] is True
-            assert metadata["enhanced_rag"] is True
-            assert metadata["pipeline"] == "enhanced_rag_fallback"
+        assert not hasattr(enhanced_rag_module, "_mock_enhanced_rag_pipeline")
 
     def test_run_enhanced_rag_pipeline_stream_mode(self):
         """Test enhanced RAG pipeline in stream mode"""
@@ -323,15 +320,11 @@ class TestEnhancedRAGService:
             )
 
             assert answer == "Integration answer"
-            assert len(contexts) == 2
-            assert contexts[0]["text"] == "Context 1"
-            assert contexts[1]["text"] == "Context 2"
+            assert contexts == ["Context 1", "Context 2"]
             assert metadata["enhanced_rag"] is True
+            assert metadata["sources"] == ["doc1.pdf", "doc2.pdf"]
+            assert metadata["uids"] == ["id1", "id2"]
             assert "total_time" in metadata
-            # Check that metadata contains expected fields
-            assert "enhanced_rag" in metadata
-            assert "total_time" in metadata
-            # Note: uids field may not be present in current implementation
             mock_generate.assert_called_once()
 
 
