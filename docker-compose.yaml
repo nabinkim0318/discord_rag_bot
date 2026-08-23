@@ -11,8 +11,8 @@ services:
       - ./.env
     environment:
       CLUSTER_HOSTNAME: weaviate-1
-      QUERY_DEFAULTS_LIMIT: "25"
-      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      QUERY_DEFAULTS_LIMIT: "${WEAVIATE_QUERY_LIMIT:-25}"
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "${WEAVIATE_ANONYMOUS_ACCESS_ENABLED:-true}"
       PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
       DEFAULT_VECTORIZER_MODULE: "text2vec-openai"
       ENABLE_MODULES: "text2vec-openai"
@@ -42,9 +42,9 @@ services:
     env_file:
       - ./.env
     environment:
-      - SERVICE_CONTEXT=backend
+      SERVICE_CONTEXT: backend
     volumes:
-      - ./backend:/app # Safe for global installation
+      - ./backend:/app
       - ./rag_agent:/app/rag_agent
     ports:
       - "8001:8001"
@@ -61,12 +61,14 @@ services:
         - CMD-SHELL
         - |
           python - <<'PY'
-          import socket, sys, time
+          import socket
+          import sys
+          import time
 
           ok = 0
           for _ in range(10):
               try:
-                  s = socket.create_connection(('127.0.0.1', 8001), timeout=2)
+                  s = socket.create_connection(("127.0.0.1", 8001), timeout=2)
                   s.close()
                   ok = 1
                   break
@@ -89,22 +91,23 @@ services:
     env_file:
       - ./.env
     environment:
-      - SERVICE_CONTEXT=bot
-      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
-      - DISCORD_TEST_GUILD_ID=579281488789635083
-      - DISCORD_CLIENT_ID=1424785730307227769
-      - DISCORD_GUILD_ID=579281488789635083
-      - USE_ASSET_EMBEDS=false
-      - ASSET_UP_PATH=assets/thumbs-up.png
-      - ASSET_DOWN_PATH=assets/thumb-down.png
-      - ASSET_REGEN_PATH=assets/refresh-page-option.png
+      SERVICE_CONTEXT: bot
+      DISCORD_BOT_TOKEN: "${DISCORD_BOT_TOKEN}"
+      DISCORD_TEST_GUILD_ID: "${DISCORD_TEST_GUILD_ID}"
+      DISCORD_CLIENT_ID: "${DISCORD_CLIENT_ID}"
+      DISCORD_GUILD_ID: "${DISCORD_GUILD_ID}"
+      USE_ASSET_EMBEDS: "${USE_ASSET_EMBEDS:-false}"
+      ASSET_UP_PATH: "${ASSET_UP_PATH:-assets/thumbs-up.png}"
+      ASSET_DOWN_PATH: "${ASSET_DOWN_PATH:-assets/thumbs-down.png}"
+      ASSET_REGEN_PATH: "${ASSET_REGEN_PATH:-assets/refresh-page-option.png}"
     depends_on:
-      api: { condition: service_started }
+      api:
+        condition: service_started
     networks:
       - app_net
     restart: unless-stopped
     profiles:
-      - discord # Optional profile for Discord bot
+      - discord
 
   # ==================== Frontend ====================
   frontend:
@@ -115,11 +118,12 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_BACKEND_API_URL=http://localhost:8001/api/v1
-      - BACKEND_URL=http://api:8001
-      - NODE_ENV=production
+      NEXT_PUBLIC_BACKEND_API_URL: "${NEXT_PUBLIC_BACKEND_API_URL:-http://localhost:8001/api/v1}"
+      BACKEND_URL: "${BACKEND_URL:-http://api:8001}"
+      NODE_ENV: "${NODE_ENV:-production}"
     depends_on:
-      api: { condition: service_started }
+      api:
+        condition: service_started
     networks:
       - app_net
     restart: unless-stopped
@@ -131,14 +135,14 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
       - "--web.console.libraries=/etc/prometheus/console_libraries"
       - "--web.console.templates=/etc/prometheus/consoles"
-      - "--storage.tsdb.retention.time=200h"
+      - "--storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-200h}"
       - "--web.enable-lifecycle"
     networks:
       - app_net
@@ -150,13 +154,16 @@ services:
     container_name: grafana
     ports:
       - "3001:3000"
+    env_file:
+      - ./.env
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin123
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/rag-metrics-dashboard.json
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/etc/grafana/provisioning/dashboards/rag-metrics-dashboard.json"
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./ops/grafana/provisioning:/etc/grafana/provisioning
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning:ro
     networks:
       - app_net
       - monitoring
@@ -168,6 +175,7 @@ networks:
   app_net:
     driver: bridge
     name: discord_rag_network
+
   monitoring:
     driver: bridge
     name: monitoring_network
@@ -175,7 +183,9 @@ networks:
 volumes:
   weaviate_data:
     driver: local
+
   prometheus_data:
     driver: local
+
   grafana_data:
     driver: local
