@@ -8,7 +8,6 @@ from uuid import uuid4
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from sqlmodel import SQLModel
 
 from app.api import query
 from app.api.v1 import enhanced_rag, feedback, health, rag
@@ -16,6 +15,7 @@ from app.core.config import settings
 from app.core.error_handlers import setup_error_handlers
 from app.core.logging import log_api_request, logger
 from app.core.metrics import instrumentator
+from app.db.schema import apply_schema
 from app.db.session import engine
 from app.models import (  # noqa: F401 ensure table registration
     feedback as _feedback_model,
@@ -35,16 +35,15 @@ logger.info("App starting...")
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager"""
-    # Startup
-    logger.info("Application startup - creating database tables")
-    SQLModel.metadata.create_all(engine)
-    logger.info("Database tables created successfully")
+    # Startup — Alembic is the runtime schema authority
+    logger.info("Application startup - applying Alembic migrations")
+    apply_schema(engine)
+    logger.info("Database schema is up to date")
 
     yield
 
     # Shutdown
-    logger.info("Application shutdown - dropping database tables")
-    logger.info("Database tables dropped successfully")
+    logger.info("Application shutdown")
 
 
 app = FastAPI(
