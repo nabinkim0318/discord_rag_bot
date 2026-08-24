@@ -5,10 +5,10 @@ It does not measure faithfulness, citation quality, or LLM output.
 
 ## Demo corpus
 
-Synthetic public documents live in `rag_agent/demo/corpus/`.
+Synthetic public documents live in `rag_agent/demo/corpus/` (6 files).
 They contain no Discord messages, user IDs, secrets, or private files.
 
-Gold labels are in `rag_agent/demo/gold.jsonl`. Each line is:
+Gold labels are in `rag_agent/demo/gold.jsonl` (8 cases). Each line is:
 
 ```json
 {"qid": "q1", "question": "...", "relevant_uids": ["doc_id#0"]}
@@ -84,6 +84,9 @@ Rationale: the corpus is small and topically separated, so BM25 should
 return the labeled chunk for lexical queries. Thresholds are below a
 perfect score on purpose. They are not evidence of production quality.
 
+Perfect 1.0 scores on this fixture are expected for easy lexical queries.
+Do not treat them as a published retrieval benchmark.
+
 ## Reproducibility limits
 
 Repeated `make eval-rag-demo` on the same checkout should match:
@@ -98,7 +101,7 @@ They will not match wall-clock latency, timestamps, or artifact filenames.
 
 Queries are lexical because sqlite FTS5 MATCH is conjunctive: every token
 must appear in the chunk. Natural-language function words (e.g. "What")
-are absent from the corpus and would make MATCH return nothing. That is a
+are absent from the corpus and would cause FTS5 MATCH to return nothing. That is a
 property of the current BM25 matcher, not a hidden hybrid fallback.
 
 Do not treat demo scores as production-grade or benchmark-quality.
