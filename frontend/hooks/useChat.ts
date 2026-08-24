@@ -34,14 +34,11 @@ export function useChat() {
         ...prev,
         { role: "bot", message: data.response, queryId: data.query_id },
       ]);
-    } catch (err) {
-      console.error("Chat error:", err);
+    } catch {
       const errorMessage =
         "⚠️ I can't answer your question right now. Please try again later.";
       setMessages((prev) => [...prev, { role: "bot", message: errorMessage }]);
-      setError(
-        (err as Error)?.message || "Unexpected error. Please try again later.",
-      );
+      setError("Something went wrong. Please try again later.");
     } finally {
       setLoading(false);
     }

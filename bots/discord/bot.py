@@ -35,8 +35,10 @@ from prometheus_client import Counter, Summary, start_http_server
 
 # add project root to Python path
 project_root = Path(__file__).parent.parent
-# logger.info(project_root)  # Commented out due to missing logger
+sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(project_root))
+
+from message_map import BoundedTTLMapping  # noqa: E402
 
 # load environment variables from project root
 # logger.info(project_root / ".env")  # Commented out due to missing logger
@@ -45,15 +47,16 @@ load_dotenv(project_root / ".env")
 logger = logging.getLogger("discord_bot")
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
-# Global mappings for interaction context
+# In-process mappings for interaction context. Lost on restart and bounded
+# by size/TTL; expired buttons keep the existing "button has expired" UX.
 # message ID → backend query_id
-MESSAGE_QID: Dict[int, str] = {}
+MESSAGE_QID: BoundedTTLMapping[int, str] = BoundedTTLMapping()
 # message ID → original question text
-MESSAGE_QUESTION: Dict[int, str] = {}
+MESSAGE_QUESTION: BoundedTTLMapping[int, str] = BoundedTTLMapping()
 
 # HTTP client configuration
-# retry = Retry(max_attempts=3, backoff_factor=0.5)  # Commented out due to httpx version compatibility
 limits = Limits(max_keepalive_connections=20, max_connections=50)
+_backend_client: Optional[httpx.AsyncClient] = None
 
 BACKEND_BASE = os.environ.get("BACKEND_BASE", "http://api:8001")
 METRICS_PATH = os.environ.get("METRICS_PATH", "/metrics")
@@ -62,6 +65,14 @@ if not DISCORD_TOKEN:
     raise RuntimeError("DISCORD_BOT_TOKEN is not set. Check your .env")
 DISCORD_APP_ID = os.environ.get("DISCORD_CLIENT_ID")
 BOT_METRICS_PORT = int(os.environ.get("BOT_METRICS_PORT", "9109"))
+
+
+def get_backend_client() -> httpx.AsyncClient:
+    """Reuse a single AsyncClient for backend calls."""
+    global _backend_client
+    if _backend_client is None or _backend_client.is_closed:
+        _backend_client = httpx.AsyncClient(timeout=30.0, limits=limits)
+    return _backend_client
 
 
 async def call_backend_query(
@@ -73,15 +84,16 @@ async def call_backend_query(
         "X-Request-ID": str(uuid.uuid4()),
         "User-Agent": "discord-rag-bot/1.0",
     }
-    async with httpx.AsyncClient(timeout=30.0, limits=limits) as client:
-        # Use query API that saves to database and returns query_id
-        r = await client.post(
-            f"{BACKEND_BASE}/api/query/",
-            json={"query": question, "top_k": top_k, "user_id": user_id},
-            headers=headers,
-        )
-        r.raise_for_status()
-        return r.json()  # {answer, contexts, metadata, query_id}
+    client = get_backend_client()
+    # Query POST is not retried: an ambiguous failure may already have
+    # persisted server-side state. Users can retry with /ask.
+    r = await client.post(
+        f"{BACKEND_BASE}/api/query/",
+        json={"query": question, "top_k": top_k, "user_id": user_id},
+        headers=headers,
+    )
+    r.raise_for_status()
+    return r.json()  # {answer, contexts, metadata, query_id}
 
 
 async def call_backend_feedback(
@@ -91,23 +103,26 @@ async def call_backend_feedback(
         "X-User-ID": user_id,
         "User-Agent": "discord-rag-bot/1.0",
     }
-    async with httpx.AsyncClient(timeout=15.0, limits=limits) as client:
-        r = await client.post(
-            f"{BACKEND_BASE}/api/v1/feedback/submit",
-            json={
-                "message_id": query_id,
-                "user_id": user_id,
-                "score": score,
-                "comment": comment,
-            },
-            headers=headers,
-        )
-        r.raise_for_status()
-        return r.json()
+    client = get_backend_client()
+    r = await client.post(
+        f"{BACKEND_BASE}/api/v1/feedback/submit",
+        json={
+            "message_id": query_id,
+            "user_id": user_id,
+            "score": score,
+            "comment": comment,
+        },
+        headers=headers,
+    )
+    r.raise_for_status()
+    return r.json()
 
 
 GUILD_ID = int(os.environ.get("DISCORD_TEST_GUILD_ID", "0"))
-logger.info(f"Bot starting with guild ID: {GUILD_ID if GUILD_ID else 'None'}")
+logger.info(
+    "Bot starting with %s command scope",
+    "guild" if GUILD_ID else "global",
+)
 
 if GUILD_ID:
     BOT = interactions.Client(
@@ -116,7 +131,7 @@ if GUILD_ID:
     )
 else:
     BOT = interactions.Client(token=DISCORD_TOKEN)
-logger.info(f"Bot initialized with guild ID: {GUILD_ID if GUILD_ID else 'None'}")
+    logger.info(f"Bot initialized with {'guild' if GUILD_ID else 'global'} command scope")
 
 
 # ---- Prometheus metrics ----
@@ -169,20 +184,12 @@ async def clear_global_commands():
 async def on_ready():
     """Bot ready event with explicit guild command sync"""
     logger.info("✅ Discord bot connected successfully!")
-    logger.info(f"📊 Bot name: {BOT.user.name}")
-    logger.info(f"🆔 Bot ID: {BOT.user.id}")
-    logger.info(f"🏠 Connected servers: {len(BOT.guilds)}")
-
-    # Print connected servers
-    if BOT.guilds:
-        logger.info("📋 Connected servers:")
-        for guild in BOT.guilds:
-            logger.info(f"  - {guild.name} (ID: {guild.id})")
+    logger.info("Connected servers: %s", len(BOT.guilds))
 
     # Explicitly sync guild commands if GUILD_ID is set
     if GUILD_ID:
         try:
-            logger.info(f"🔄 Syncing commands for guild ID: {GUILD_ID}")
+            logger.info("Syncing guild-scoped commands")
             # Ensure no global duplicates linger
             await clear_global_commands()
             await BOT.synchronize_interactions()
@@ -271,47 +278,33 @@ async def ask(ctx: SlashContext, question: str, private: bool = False):
             top_k=5,
             channel_id=str(ctx.channel_id),
         )
-        logger.info(f"Backend response payload: {type(payload)} - {payload}")
         answer = payload.get("answer", "[no answer]")
-        logger.info(f"Extracted answer: {answer}")
-        query_id = payload.get("query_id") or str(uuid.uuid4())  # button fallback id
-        logger.info(f"Extracted query_id: {query_id}")
+        query_id = payload.get("query_id")
         latency = int((time.perf_counter() - start) * 1000)
-        logger.info(f"Latency: {latency}ms")
+        logger.info("Ask completed in %sms", latency)
 
-        # DM or ephemeral fallback
-        logger.info("About to create buttons...")
-        buttons = fb_buttons(query_id)
-        logger.info(f"Created buttons: {type(buttons)}")
         sent = None
+        buttons = fb_buttons(str(query_id)) if query_id else None
+        send_kwargs = {"components": [buttons]} if buttons else {}
         if private:
             try:
                 user = await BOT.fetch_user(ctx.author.id)
-                sent = await user.send(answer, components=[buttons])
-            except Exception:  # Forbidden or other DM errors
-                sent = await ctx.send(
-                    answer,
-                    flags=MessageFlags.EPHEMERAL,
-                    components=[buttons],
-                )
+                sent = await user.send(answer, **send_kwargs)
             except Exception:
                 sent = await ctx.send(
                     answer,
                     flags=MessageFlags.EPHEMERAL,
-                    components=[buttons],
+                    **send_kwargs,
                 )
         else:
-            sent = await ctx.send(answer, components=[buttons])
-            logger.info(f"Sent message to channel: {sent}")
+            sent = await ctx.send(answer, **send_kwargs)
 
-        # Map Discord message ID → backend query_id and question for follow-up actions
-        try:
-            if sent and getattr(sent, "id", None):
+        if query_id and sent and getattr(sent, "id", None):
+            try:
                 MESSAGE_QID[int(sent.id)] = str(query_id)
                 MESSAGE_QUESTION[int(sent.id)] = question
-                logger.info(f"Stored MESSAGE_QID[{int(sent.id)}] = {query_id}")
-        except Exception:
-            logger.warning("Could not store message→query mapping")
+            except Exception:
+                logger.warning("Could not store message→query mapping")
 
         # discord_message_id = getattr(sent, "id", None)
         ASK_LATENCY.observe(time.perf_counter() - start)
@@ -359,9 +352,7 @@ async def on_fb_up(ctx: ComponentContext):
                 flags=MessageFlags.EPHEMERAL,
             )
             return
-        logger.info(
-            f"Calling backend feedback (up) for user {ctx.author.id}, qid={query_id}"
-        )
+        logger.info("Submitting feedback (up)")
         await call_backend_feedback(
             query_id=query_id,
             user_id=str(ctx.author.id),
@@ -380,7 +371,7 @@ async def on_fb_up(ctx: ComponentContext):
         except Exception:
             text = None
         logger.error(
-            f"HTTP error in feedback processing (up): status={status} body={text}"
+            "HTTP error in feedback processing (up): status=%s", status
         )
         if status == 400 and text and "already submitted" in text.lower():
             await ctx.send(
@@ -419,9 +410,7 @@ async def on_fb_down(ctx: ComponentContext):
                 flags=MessageFlags.EPHEMERAL,
             )
             return
-        logger.info(
-            f"Calling backend feedback (down) for user {ctx.author.id}, qid={query_id}"
-        )
+        logger.info("Submitting feedback (down)")
         await call_backend_feedback(
             query_id=query_id,
             user_id=str(ctx.author.id),
@@ -440,7 +429,7 @@ async def on_fb_down(ctx: ComponentContext):
         except Exception:
             text = None
         logger.error(
-            f"HTTP error in feedback processing (down): status={status} body={text}"
+            "HTTP error in feedback processing (down): status=%s", status
         )
         if status == 400 and text and "already submitted" in text.lower():
             await ctx.send(
@@ -487,16 +476,17 @@ async def on_fb_regen(ctx: ComponentContext):
             channel_id=str(ctx.channel_id),
         )
         answer = payload.get("answer", "[no answer]")
-        # Send a fresh message with buttons bound to new query_id
-        new_qid = payload.get("query_id") or str(uuid.uuid4())
-        row = fb_buttons(new_qid)
-        sent = await ctx.send(answer, flags=MessageFlags.EPHEMERAL, components=[row])
-        try:
-            if sent and getattr(sent, "id", None):
+        new_qid = payload.get("query_id")
+        send_kwargs = {}
+        if new_qid:
+            send_kwargs["components"] = [fb_buttons(str(new_qid))]
+        sent = await ctx.send(answer, flags=MessageFlags.EPHEMERAL, **send_kwargs)
+        if new_qid and sent and getattr(sent, "id", None):
+            try:
                 MESSAGE_QID[int(sent.id)] = str(new_qid)
                 MESSAGE_QUESTION[int(sent.id)] = question
-        except Exception:
-            logger.warning("Could not store message→query mapping for regen")
+            except Exception:
+                logger.warning("Could not store message→query mapping for regen")
     except httpx.HTTPError as e:
         COMMAND_ERRORS.labels(stage="regen_http").inc()
         logger.error(f"HTTP error in regenerate: {e}")
@@ -521,16 +511,7 @@ async def on_fb_regen(ctx: ComponentContext):
 )
 async def health(ctx: SlashContext):
     try:
-        async with httpx.AsyncClient(
-            timeout=5.0,
-            limits=limits,
-        ) as client:
-            r = await client.get(
-                f"{BACKEND_BASE}/api/v1/health/",
-                headers={"User-Agent": "discord-rag-bot/1.0"},
-            )
-            r.raise_for_status()
-            data = r.json()
+        data = await get_backend_json(f"{BACKEND_BASE}/api/v1/health/", timeout=5.0)
         await ctx.send(
             f"Backend: {data.get('status', 'unknown')}", flags=MessageFlags.EPHEMERAL
         )
@@ -574,26 +555,24 @@ def parse_prometheus_text(text: str) -> Dict[str, Dict[Tuple, float]]:
 
 
 async def get_backend_text(url: str, timeout: float = 10.0) -> str:
-    async with httpx.AsyncClient(
-        timeout=timeout,
-        limits=limits,
-    ) as client:
-        r = await client.get(url, headers={"User-Agent": "discord-rag-bot/1.0"})
-        r.raise_for_status()
-        return r.text
+    client = get_backend_client()
+    r = await client.get(
+        url, headers={"User-Agent": "discord-rag-bot/1.0"}, timeout=timeout
+    )
+    r.raise_for_status()
+    return r.text
 
 
 async def get_backend_json(
     url: str, timeout: float = 10.0, *, raise_for_status: bool = True
 ) -> dict:
-    async with httpx.AsyncClient(
-        timeout=timeout,
-        limits=limits,
-    ) as client:
-        r = await client.get(url, headers={"User-Agent": "discord-rag-bot/1.0"})
-        if raise_for_status:
-            r.raise_for_status()
-        return r.json()
+    client = get_backend_client()
+    r = await client.get(
+        url, headers={"User-Agent": "discord-rag-bot/1.0"}, timeout=timeout
+    )
+    if raise_for_status:
+        r.raise_for_status()
+    return r.json()
 
 
 @slash_command(

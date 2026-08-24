@@ -134,9 +134,14 @@ def run_rag_pipeline(
         duration = time.time() - start
         record_rag_pipeline_latency(duration)
         log_rag_operation(
-            query, True, duration, len(contexts), user_id, channel_id, request_id
+            success=True,
+            duration=duration,
+            contexts_count=len(contexts),
+            request_id=request_id,
+            query_length=len(query),
         )
 
+        reranker_applied = (meta.get("retrieval") or {}).get("reranker")
         meta.update(
             {
                 "sources": [h.get("source") for h in used_hits],
@@ -144,25 +149,18 @@ def run_rag_pipeline(
                 "pipeline_duration": round(duration, 3),
                 "prompt_version": prompt_version,
                 "ab_test_group": ab_test_group,
-                "use_rerank": use_rerank,
+                "use_rerank": bool(reranker_applied),
             }
         )
         return answer, contexts, meta
     except Exception:
         duration = time.time() - start
         record_rag_pipeline_latency(duration)
-        log_rag_operation(query, False, duration, 0, user_id, channel_id, request_id)
+        log_rag_operation(
+            success=False,
+            duration=duration,
+            contexts_count=0,
+            request_id=request_id,
+            query_length=len(query),
+        )
         raise
-
-
-def store_rag_result_in_weaviate(
-    query: str, answer: str, contexts: List[str], metadata: Dict[str, Any]
-) -> bool:
-    """
-    Store RAG result in Weaviate vector database.
-    This is a placeholder implementation.
-    """
-    logger.warning("Using mock store_rag_result_in_weaviate - rag_agent not available")
-
-    # Mock implementation - always return success
-    return True

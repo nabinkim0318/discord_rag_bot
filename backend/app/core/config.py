@@ -31,6 +31,7 @@ class Settings:
     RAG_AGENT_PATH: Path = Path("../rag_agent")
     DEFAULT_TOP_K: int = 5
     MAX_TOP_K: int = 20
+    MAX_QUERY_LENGTH: int = int(os.getenv("MAX_QUERY_LENGTH", "4000"))
 
     # ==================== External API Settings ====================
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")

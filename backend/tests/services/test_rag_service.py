@@ -266,15 +266,11 @@ class TestRAGService:
         mock_topk.assert_called_once_with(5)
         mock_hit.assert_not_called()
         mock_latency.assert_called_once()
-        mock_log.assert_called_once_with(
-            "Failing query",
-            False,
-            mock_log.call_args.args[2],
-            0,
-            "user123",
-            "channel456",
-            "req789",
-        )
+        mock_log.assert_called_once()
+        assert mock_log.call_args.kwargs["success"] is False
+        assert mock_log.call_args.kwargs["contexts_count"] == 0
+        assert mock_log.call_args.kwargs["request_id"] == "req789"
+        assert mock_log.call_args.kwargs["query_length"] == len("Failing query")
 
     @patch("app.services.rag_service.generate_answer_adapter")
     def test_run_rag_pipeline_no_contexts(self, mock_adapter):

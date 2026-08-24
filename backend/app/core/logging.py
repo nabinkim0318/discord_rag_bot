@@ -77,18 +77,13 @@ def log_api_request(
     path: str,
     status_code: int,
     duration: float,
-    user_id: Optional[str] = None,
-    channel_id: Optional[str] = None,
     request_id: Optional[str] = None,
     **kwargs,
 ):
-    """API request logging"""
-    logger.bind(
-        api_request=True, request_id=request_id, user_id=user_id, channel_id=channel_id
-    ).info(
-        f"API Request: {method} {path} | Status: {status_code} \
-        | Duration: {duration:.3f}s \
-        | User: {user_id} | Channel: {channel_id} | RequestID: {request_id}",
+    """API request logging without user content or identity fields."""
+    logger.bind(api_request=True, request_id=request_id).info(
+        f"API Request: {method} {path} | Status: {status_code} "
+        f"| Duration: {duration:.3f}s | RequestID: {request_id}",
         **kwargs,
     )
 
@@ -110,21 +105,25 @@ def log_database_operation(
 
 
 def log_rag_operation(
-    query: str,
+    *,
     success: bool,
     duration: Optional[float] = None,
     contexts_count: Optional[int] = None,
-    user_id: Optional[str] = None,
-    channel_id: Optional[str] = None,
     request_id: Optional[str] = None,
+    query_length: Optional[int] = None,
+    endpoint: Optional[str] = None,
     **kwargs,
 ):
-    """RAG operation logging"""
+    """RAG operation logging without query text or user/channel identifiers."""
     status = "SUCCESS" if success else "FAILED"
     duration_str = f" | Duration: {duration:.3f}s" if duration else ""
-    contexts_str = f" | Contexts: {contexts_count}" if contexts_count else ""
-    logger.bind(request_id=request_id, user_id=user_id, channel_id=channel_id).info(
-        f"RAG Query: '{query[:50]}...' | Status: {status}{duration_str}{contexts_str} \
-        | User: {user_id} | Channel: {channel_id} | RequestID: {request_id}",
+    contexts_str = (
+        f" | Contexts: {contexts_count}" if contexts_count is not None else ""
+    )
+    length_str = f" | QueryLength: {query_length}" if query_length is not None else ""
+    endpoint_str = f" | Endpoint: {endpoint}" if endpoint else ""
+    logger.bind(request_id=request_id).info(
+        f"RAG Query: Status: {status}{duration_str}{contexts_str}{length_str}"
+        f"{endpoint_str} | RequestID: {request_id}",
         **kwargs,
     )

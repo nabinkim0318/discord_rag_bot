@@ -15,6 +15,7 @@ from app.core.exceptions import (
     ValidationException,
 )
 from app.core.logging import logger
+from app.core.request_id import get_request_id
 from app.models.error import (
     ErrorDetail,
     create_circuit_breaker_error,
@@ -25,10 +26,7 @@ from app.models.error import (
     create_validation_error,
 )
 
-
-def get_request_id(request: Request) -> str:
-    """Extract request ID from headers or generate one"""
-    return request.headers.get("X-Request-ID", "unknown")
+PUBLIC_DATABASE_ERROR = "A database error occurred"
 
 
 def setup_error_handlers(app: FastAPI) -> None:
@@ -55,9 +53,12 @@ def setup_error_handlers(app: FastAPI) -> None:
         )
 
         logger.warning(
-            "Validation Error: {}",
-            exc,
-            extra={"request_id": request_id, "details": details},
+            "Validation Error: {} field(s)",
+            len(details),
+            extra={
+                "request_id": request_id,
+                "error_types": [error["type"] for error in exc.errors()],
+            },
         )
 
         return JSONResponse(status_code=422, content=error_response.model_dump())
@@ -141,7 +142,7 @@ def setup_error_handlers(app: FastAPI) -> None:
         request_id = get_request_id(request)
 
         error_response = create_database_error(
-            message=exc.message, request_id=request_id
+            message=PUBLIC_DATABASE_ERROR, request_id=request_id
         )
 
         logger.error(

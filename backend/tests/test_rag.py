@@ -31,7 +31,6 @@ def test_query_rag_success(client):
         payload = {
             "query": "What is Retrieval-Augmented Generation?",
             "top_k": 3,
-            "use_streaming": False,
         }
 
         response = client.post("/api/v1/rag/", json=payload)

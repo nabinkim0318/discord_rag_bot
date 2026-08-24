@@ -2,27 +2,37 @@
 Feedback API endpoints
 """
 
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.exceptions import DatabaseException
 from app.core.logging import logger
 from app.services.feedback_service import feedback_service
 
 feedback_router = APIRouter(prefix="/api/v1/feedback", tags=["feedback"])
 
+WEB_FEEDBACK_USER_ID = "web"
+
 
 class FeedbackRequest(BaseModel):
     """Request model for submitting feedback"""
 
-    query_id: str = Field(alias="message_id")  # Using alias for API compatibility
-    user_id: str
-    score: str  # 'up' or 'down'
-    comment: Optional[str] = None
+    model_config = ConfigDict(populate_by_name=True)
 
-    class Config:
-        populate_by_name = True
+    query_id: str = Field(alias="message_id")  # Using alias for API compatibility
+    user_id: Optional[str] = Field(
+        default=WEB_FEEDBACK_USER_ID,
+        max_length=128,
+        description=(
+            "Caller-supplied feedback identity for duplicate detection. "
+            "Not authentication. Web clients may omit this; Discord sends "
+            "the Discord user id."
+        ),
+    )
+    score: str  # 'up' or 'down'
+    comment: Optional[str] = Field(default=None, max_length=1000)
 
 
 class FeedbackResponse(BaseModel):
@@ -40,18 +50,6 @@ class FeedbackStatsResponse(BaseModel):
     total: int
 
 
-class FeedbackHistoryResponse(BaseModel):
-    """Response model for user feedback history"""
-
-    id: str
-    query_id: str
-    score: str
-    comment: Optional[str]
-    created_at: str
-    question: str
-    response: str
-
-
 class FeedbackSummaryResponse(BaseModel):
     """Response model for feedback summary"""
 
@@ -64,21 +62,14 @@ class FeedbackSummaryResponse(BaseModel):
 
 
 @feedback_router.post("/submit", response_model=FeedbackResponse)
-async def submit_feedback(feedback: FeedbackRequest):
+def submit_feedback(feedback: FeedbackRequest):
     """
     Submit user feedback for a RAG response
-
-    Args:
-        feedback: Feedback data including message_id, user_id, score,
-        and optional comment
-
-    Returns:
-        Feedback submission result
     """
     try:
         success, message = feedback_service.submit_feedback(
             query_id=feedback.query_id,
-            user_id=feedback.user_id,
+            user_id=feedback.user_id or WEB_FEEDBACK_USER_ID,
             score=feedback.score,
             comment=feedback.comment,
         )
@@ -90,27 +81,20 @@ async def submit_feedback(feedback: FeedbackRequest):
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Unexpected error in submit_feedback: {e}")
-        from app.core.exceptions import DatabaseException
-
+    except Exception:
+        logger.exception("Unexpected error in submit_feedback")
         raise DatabaseException(
-            message=f"Feedback submission failed: {str(e)}",
+            message="Feedback submission failed",
             error_code="FEEDBACK_SUBMISSION_ERROR",
             details={"service": "feedback_service"},
         )
 
 
 @feedback_router.get("/stats/{query_id}", response_model=FeedbackStatsResponse)
-async def get_feedback_stats(query_id: str):
+def get_feedback_stats(query_id: str):
     """
-    Get feedback statistics for a specific query
-
-    Args:
-        query_id: UUID of the query
-
-    Returns:
-        Feedback statistics (up/down counts)
+    Get aggregate feedback counts for a specific query.
+    Does not return prompts, answers, or user identifiers.
     """
     try:
         stats = feedback_service.get_feedback_stats(query_id)
@@ -119,66 +103,20 @@ async def get_feedback_stats(query_id: str):
             up=stats["up"], down=stats["down"], total=stats["up"] + stats["down"]
         )
 
-    except Exception as e:
-        logger.error(f"Error getting feedback stats: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-@feedback_router.get("/history/{user_id}", response_model=List[FeedbackHistoryResponse])
-async def get_user_feedback_history(
-    user_id: str,
-    limit: int = Query(
-        default=10,
-        ge=1,
-        le=100,
-        description="Maximum number of feedback records to return",
-    ),
-):
-    """
-    Get feedback history for a specific user
-
-    Args:
-        user_id: Discord user ID
-        limit: Maximum number of feedback records to return
-
-    Returns:
-        List of user's feedback history
-    """
-    try:
-        feedback_list = feedback_service.get_user_feedback(user_id, limit)
-
-        return [
-            FeedbackHistoryResponse(
-                id=item["id"],
-                query_id=item["query_id"],
-                score=item["score"],
-                comment=item["comment"],
-                created_at=item["created_at"],
-                question=item["question"],
-                response=item["response"],
-            )
-            for item in feedback_list
-        ]
-
-    except Exception as e:
-        logger.error(f"Error getting user feedback history: {e}")
+    except Exception:
+        logger.exception("Error getting feedback stats")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @feedback_router.get("/summary", response_model=FeedbackSummaryResponse)
-async def get_feedback_summary(
+def get_feedback_summary(
     days: int = Query(
         default=7, ge=1, le=365, description="Number of days to look back"
     ),
 ):
     """
-    Get feedback summary statistics
-
-    Args:
-        days: Number of days to look back for statistics
-
-    Returns:
-        Feedback summary statistics
+    Get aggregate feedback summary statistics.
+    Does not return prompts, answers, or user identifiers.
     """
     try:
         summary = feedback_service.get_feedback_summary(days)
@@ -192,17 +130,14 @@ async def get_feedback_summary(
             satisfaction_rate=summary["satisfaction_rate"],
         )
 
-    except Exception as e:
-        logger.error(f"Error getting feedback summary: {e}")
+    except Exception:
+        logger.exception("Error getting feedback summary")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @feedback_router.get("/health")
-async def health_check():
+def health_check():
     """
     Health check endpoint for feedback service
-
-    Returns:
-        Service health status
     """
     return {"status": "healthy", "service": "feedback"}

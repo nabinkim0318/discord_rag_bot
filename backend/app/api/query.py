@@ -1,9 +1,8 @@
 # app/api/query.py
 from time import perf_counter
-from typing import List
 
 from fastapi import APIRouter, Depends, Request
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.core.exceptions import ExternalServiceException, RAGException
 from app.core.logging import logger
@@ -12,6 +11,7 @@ from app.core.metrics import (
     rag_query_latency,
     record_failure_metric,
 )
+from app.core.request_id import get_request_id
 from app.db.session import get_session
 from app.models.query import Query
 from app.models.rag import RAGQueryRequest, RAGQueryResponse
@@ -21,60 +21,34 @@ query_router = APIRouter()
 
 
 @query_router.post("/", response_model=RAGQueryResponse)
-async def query_rag(
+def query_rag(
     request: RAGQueryRequest,
+    http_request: Request,
     session: Session = Depends(get_session),
-    http_request: Request = None,
 ):
     """
     RAG query processing and database storage
     """
     start = perf_counter()
     try:
-        # Extract tracing/user context
-        user_id = request.user_id  # Default from request body
-        channel_id = None
-        request_id = None
-        try:
-            if http_request is not None:
-                # Override with header values if present
-                header_user_id = http_request.headers.get("X-User-ID")
-                if header_user_id:
-                    user_id = header_user_id
-                channel_id = http_request.headers.get("X-Channel-ID")
-                request_id = http_request.headers.get("X-Request-ID")
-        except Exception:
-            pass
+        request_id = get_request_id(http_request)
+        # Body user_id is optional persistence metadata, not authentication.
+        user_id = request.user_id
 
-        logger.info(
-            "Processing RAG query: {}",
-            request.query,
-            extra={
-                "request_id": request_id,
-                "user_id": user_id,
-                "channel_id": channel_id,
-            },
-        )
-
-        # Run RAG pipeline
         answer, contexts, metadata = run_rag_pipeline(
             request.query,
-            request.top_k or 5,
-            user_id=user_id,
-            channel_id=channel_id,
+            request.top_k,
             request_id=request_id,
         )
 
-        # Save query result to database
         query_record = Query(
-            user_id=user_id,  # Use the extracted/override user_id
+            user_id=user_id,
             query=request.query,
             answer=answer,
             context={
                 "contexts": contexts,
                 "metadata": metadata,
-                "top_k": getattr(request, "top_k", 5),
-                "use_streaming": getattr(request, "use_streaming", False),
+                "top_k": request.top_k,
             },
         )
 
@@ -82,24 +56,8 @@ async def query_rag(
         session.commit()
         session.refresh(query_record)
 
-        logger.info(
-            "Query saved to database with ID: {}",
-            query_record.id,
-            extra={
-                "request_id": request_id,
-                "user_id": user_id,
-                "query_id": query_record.id,
-            },
-        )
-
-        # Store RAG result in Weaviate with actual query_id
-        from app.services.rag_service import store_rag_result_in_weaviate
-
-        store_rag_result_in_weaviate(
-            query=request.query,
-            answer=answer,
-            contexts=contexts,
-            metadata=metadata,
+        logger.bind(request_id=request_id, query_id=query_record.id).info(
+            "Query saved to database"
         )
 
         dur = perf_counter() - start
@@ -114,7 +72,7 @@ async def query_rag(
         }
 
     except Exception as exc:
-        logger.error(f"RAG query failed: {str(exc)}")
+        logger.exception("RAG query failed")
         try:
             session.rollback()
         except Exception:
@@ -137,8 +95,3 @@ async def query_rag(
             error_code="QUERY_PROCESSING_ERROR",
             details={"stage": "query_processing", "endpoint": "/api/query/"},
         ) from exc
-
-
-@query_router.get("/queries/", response_model=List[Query])
-def get_queries(session: Session = Depends(get_session)):
-    return session.exec(select(Query)).all()
