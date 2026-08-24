@@ -8,6 +8,7 @@ Enhanced RAG API endpoints
 
 from fastapi import APIRouter, Request
 
+from app.core.exceptions import ExternalServiceException, RAGException
 from app.core.metrics import record_failure_metric
 from app.models.rag import RAGQueryRequest, RAGQueryResponse
 from app.services.enhanced_rag_service import run_enhanced_rag_pipeline
@@ -47,18 +48,28 @@ async def enhanced_query_rag(request: RAGQueryRequest, http_request: Request):
             "metadata": metadata,
         }
 
-    except Exception as e:
-        record_failure_metric("/api/v1/enhanced-rag/", "pipeline_error")
-        from app.core.exceptions import RAGException
-
+    except RAGException as exc:
+        record_failure_metric("/api/v1/enhanced-rag/", exc.error_code)
+        raise
+    except ExternalServiceException as exc:
+        record_failure_metric("/api/v1/enhanced-rag/", exc.error_code)
+        raise ExternalServiceException(
+            message="RAG dependency is temporarily unavailable",
+            error_code=exc.error_code,
+            service_name=exc.service_name,
+            details={"endpoint": "/api/v1/enhanced-rag/"},
+        ) from exc
+    except Exception as exc:
+        record_failure_metric("/api/v1/enhanced-rag/", "ENHANCED_RAG_PIPELINE_ERROR")
         raise RAGException(
-            message=f"Enhanced RAG pipeline failed: {str(e)}",
+            message="RAG service is temporarily unavailable",
             error_code="ENHANCED_RAG_PIPELINE_ERROR",
             details={
                 "stage": "enhanced_generation",
                 "endpoint": "/api/v1/enhanced-rag/",
+                "exception_type": type(exc).__name__,
             },
-        )
+        ) from exc
 
 
 @enhanced_rag_router.get("/health")

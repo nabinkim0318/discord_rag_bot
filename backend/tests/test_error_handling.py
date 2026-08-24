@@ -219,11 +219,13 @@ class TestErrorHandlingIntegration:
         client = TestClient(app)
         response = client.get("/test-rag-error")
 
-        assert response.status_code == 500
+        assert response.status_code == 503
         data = response.json()
         assert data["error"] == "RAG Pipeline Error"
         assert data["error_code"] == "RAG_ERROR"
         assert data["stage"] == "retrieval"
+        assert data["message"] == "RAG service is temporarily unavailable"
+        assert response.headers["Retry-After"] == "30"
 
     def test_validation_error_handling(self):
         """Test validation error handling in API"""
@@ -271,41 +273,14 @@ class TestErrorHandlingIntegration:
 
 
 class TestCircuitBreakerIntegration:
-    """Test circuit breaker integration with services"""
+    """Test that runtime RAG services no longer expose fabricated helpers."""
 
-    def test_weaviate_circuit_breaker(self):
-        """Test Weaviate circuit breaker behavior"""
-        # This test is simplified since we can't easily mock the decorator
-        # In a real scenario, we would test the circuit breaker behavior
-        # by making actual calls that fail
+    def test_runtime_rag_service_has_no_mock_retrieval_or_llm_helpers(self):
+        from app.services import rag_service
 
-        from app.services.rag_service import search_similar_documents
-
-        # Test that the function exists and can be called
-        # (actual circuit breaker testing would require more complex setup)
-        try:
-            result = search_similar_documents("test query", 3)
-            assert isinstance(result, list)
-        except Exception:
-            # Expected to fail in test environment
-            pass
-
-    def test_openai_circuit_breaker(self):
-        """Test OpenAI circuit breaker behavior"""
-        # This test is simplified since we can't easily mock the decorator
-        # In a real scenario, we would test the circuit breaker behavior
-        # by making actual calls that fail
-
-        from app.services.rag_service import call_llm
-
-        # Test that the function exists and can be called
-        # (actual circuit breaker testing would require more complex setup)
-        try:
-            result = call_llm("test prompt")
-            assert isinstance(result, str)
-        except Exception:
-            # Expected to fail in test environment
-            pass
+        assert not hasattr(rag_service, "search_similar_documents")
+        assert not hasattr(rag_service, "call_llm")
+        assert not hasattr(rag_service, "generate_answer_mock")
 
 
 if __name__ == "__main__":

@@ -5,11 +5,13 @@ Tests for RAG service functionality
 from unittest.mock import patch
 
 import pytest
+from rag_mocks import generate_answer_mock
 
+from app.core.exceptions import ExternalServiceException, RAGException
+from app.services import rag_service as rag_service_module
 from app.services.rag_service import (
     generate_answer,
     generate_answer_adapter,
-    generate_answer_mock,
     run_rag_pipeline,
 )
 
@@ -104,25 +106,36 @@ class TestRAGService:
     @patch("app.services.rag_service.rag_generate_answer")
     def test_generate_answer_rag_agent_failure(self, mock_rag_generate):
         """Test generate_answer when RAG agent fails"""
-        # Mock RAG agent failure
         mock_rag_generate.side_effect = Exception("RAG agent failed")
 
-        query = "Test query"
-        answer, contexts, metadata = generate_answer(query)
+        with pytest.raises(RAGException) as exc_info:
+            generate_answer("Test query")
 
-        # Should fall back to mock
-        assert "Mock response" in answer
-        assert metadata["mock"] is True
+        assert exc_info.value.error_code == "RAG_GENERATION_ERROR"
+        assert exc_info.value.details["stage"] == "generation"
+        assert not hasattr(rag_service_module, "generate_answer_mock")
+
+    @patch("app.services.rag_service.RAG_AGENT_AVAILABLE", True)
+    @patch("app.services.rag_service.rag_generate_answer")
+    def test_generate_answer_preserves_provider_exception(self, mock_rag_generate):
+        provider_error = ExternalServiceException(
+            "provider failed", service_name="llm-provider"
+        )
+        mock_rag_generate.side_effect = provider_error
+
+        with pytest.raises(ExternalServiceException) as exc_info:
+            generate_answer("Test query")
+
+        assert exc_info.value is provider_error
 
     @patch("app.services.rag_service.RAG_AGENT_AVAILABLE", False)
     def test_generate_answer_without_rag_agent(self):
         """Test generate_answer when RAG agent is not available"""
-        query = "Test query"
-        answer, contexts, metadata = generate_answer(query)
+        with pytest.raises(RAGException) as exc_info:
+            generate_answer("Test query")
 
-        # Should use mock
-        assert "Mock response" in answer
-        assert metadata["mock"] is True
+        assert exc_info.value.error_code == "RAG_DEPENDENCY_UNAVAILABLE"
+        assert exc_info.value.details["stage"] == "initialization"
 
     def test_generate_answer_adapter(self):
         """Test generate_answer_adapter function"""
@@ -154,12 +167,11 @@ class TestRAGService:
         with patch("app.services.rag_service.generate_answer") as mock_generate:
             mock_generate.side_effect = Exception("Generation failed")
 
-            # Should fall back to mock, not raise exception
-            answer, contexts, metadata = generate_answer_adapter(query)
+            with pytest.raises(RAGException) as exc_info:
+                generate_answer_adapter(query)
 
-            # Check that mock response is returned
-            assert "Mock response" in answer
-            assert metadata["mock"] is True
+        assert exc_info.value.error_code == "RAG_PIPELINE_ERROR"
+        assert not hasattr(rag_service_module, "generate_answer_mock")
 
     @patch("app.services.rag_service.generate_answer_adapter")
     @patch("app.services.rag_service.record_retriever_topk")
@@ -227,6 +239,42 @@ class TestRAGService:
         assert "pipeline_duration" in metadata
         assert metadata["sources"] == ["doc1.pdf", "doc2.pdf"]
         assert metadata["uids"] == ["pipeline-1", "pipeline-2"]
+
+    @patch("app.services.rag_service.generate_answer_adapter")
+    @patch("app.services.rag_service.record_retriever_topk")
+    @patch("app.services.rag_service.record_retrieval_hit")
+    @patch("app.services.rag_service.record_rag_pipeline_latency")
+    @patch("app.services.rag_service.log_rag_operation")
+    def test_run_rag_pipeline_failure_uses_failure_accounting(
+        self, mock_log, mock_latency, mock_hit, mock_topk, mock_adapter
+    ):
+        mock_adapter.side_effect = RAGException(
+            "RAG service is temporarily unavailable",
+            error_code="RAG_GENERATION_ERROR",
+            details={"stage": "generation"},
+        )
+
+        with pytest.raises(RAGException):
+            run_rag_pipeline(
+                "Failing query",
+                top_k=5,
+                user_id="user123",
+                channel_id="channel456",
+                request_id="req789",
+            )
+
+        mock_topk.assert_called_once_with(5)
+        mock_hit.assert_not_called()
+        mock_latency.assert_called_once()
+        mock_log.assert_called_once_with(
+            "Failing query",
+            False,
+            mock_log.call_args.args[2],
+            0,
+            "user123",
+            "channel456",
+            "req789",
+        )
 
     @patch("app.services.rag_service.generate_answer_adapter")
     def test_run_rag_pipeline_no_contexts(self, mock_adapter):
@@ -308,30 +356,32 @@ class TestRAGService:
 class TestRAGServiceIntegration:
     """Integration tests for RAG service"""
 
-    def test_full_pipeline_mock(self):
-        """Test full pipeline with mock implementation"""
+    @patch("app.services.rag_service.generate_answer_adapter")
+    def test_full_pipeline_with_explicit_test_double(self, mock_adapter):
+        """Test full pipeline with an explicitly injected test response"""
         query = "What is artificial intelligence?"
+        mock_adapter.return_value = (
+            "Test answer",
+            [{"chunk_uid": "test-1", "text": "Test context", "source": "test.pdf"}],
+            {"test_double": True},
+        )
 
-        # This should use mock since RAG_AGENT_AVAILABLE is likely False in test
         answer, contexts, metadata = run_rag_pipeline(query, top_k=3)
 
-        # Check response structure
-        assert isinstance(answer, str)
-        assert isinstance(contexts, list)
-        assert isinstance(metadata, dict)
-
-        # Check that we got some response
-        assert len(answer) > 0
+        assert answer == "Test answer"
+        assert contexts == ["Test context"]
         assert "pipeline_duration" in metadata
         assert "sources" in metadata
         assert "uids" in metadata
 
-    def test_pipeline_with_user_context(self):
+    @patch("app.services.rag_service.generate_answer_adapter")
+    def test_pipeline_with_user_context(self, mock_adapter):
         """Test pipeline with user and channel context"""
         query = "How to submit assignments?"
         user_id = "user123"
         channel_id = "channel456"
         request_id = "req789"
+        mock_adapter.return_value = ("Test answer", [], {"test_double": True})
 
         answer, contexts, metadata = run_rag_pipeline(
             query=query,

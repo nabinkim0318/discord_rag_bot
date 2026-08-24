@@ -1,5 +1,8 @@
+from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 
+from app.core.exceptions import RAGException
 from app.main import app
 
 
@@ -55,3 +58,31 @@ def test_query_endpoint_mock(monkeypatch):
         data = resp.json()
         assert data["answer"] == "mock-answer"
         assert data["contexts"] == ["ctx1", "ctx2"]
+
+
+def test_query_endpoint_failure_records_metric_and_returns_503(monkeypatch):
+    import app.api.query as query_router
+
+    pipeline_error = RAGException(
+        "internal retrieval detail",
+        error_code="RAG_RETRIEVAL_ERROR",
+        details={"stage": "retrieval"},
+    )
+
+    def failing_pipeline(*args, **kwargs):
+        raise pipeline_error
+
+    monkeypatch.setattr(query_router, "run_rag_pipeline", failing_pipeline)
+
+    with (
+        patch("app.api.query.record_failure_metric") as mock_failure_metric,
+        TestClient(app) as client,
+    ):
+        response = client.post(
+            "/api/query/",
+            json={"query": "failing query", "top_k": 3},
+        )
+
+    assert response.status_code == 503
+    assert "internal retrieval detail" not in response.text
+    mock_failure_metric.assert_called_once_with("/api/query/", "RAG_RETRIEVAL_ERROR")

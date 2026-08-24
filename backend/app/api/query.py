@@ -5,8 +5,13 @@ from typing import List
 from fastapi import APIRouter, Depends, Request
 from sqlmodel import Session, select
 
+from app.core.exceptions import ExternalServiceException, RAGException
 from app.core.logging import logger
-from app.core.metrics import rag_query_counter, rag_query_latency
+from app.core.metrics import (
+    rag_query_counter,
+    rag_query_latency,
+    record_failure_metric,
+)
 from app.db.session import get_session
 from app.models.query import Query
 from app.models.rag import RAGQueryRequest, RAGQueryResponse
@@ -108,19 +113,30 @@ async def query_rag(
             "query_id": query_record.id,
         }
 
-    except Exception as e:
-        logger.error(f"RAG query failed: {str(e)}")
+    except Exception as exc:
+        logger.error(f"RAG query failed: {str(exc)}")
         try:
             session.rollback()
         except Exception:
             pass  # Session might already be closed
-        from app.core.exceptions import RAGException
 
+        error_code = getattr(exc, "error_code", "QUERY_PROCESSING_ERROR")
+        record_failure_metric("/api/query/", error_code)
+
+        if isinstance(exc, RAGException):
+            raise
+        if isinstance(exc, ExternalServiceException):
+            raise ExternalServiceException(
+                message="RAG dependency is temporarily unavailable",
+                error_code=exc.error_code,
+                service_name=exc.service_name,
+                details={"endpoint": "/api/query/"},
+            ) from exc
         raise RAGException(
-            message=f"Query processing failed: {str(e)}",
+            message="RAG service is temporarily unavailable",
             error_code="QUERY_PROCESSING_ERROR",
             details={"stage": "query_processing", "endpoint": "/api/query/"},
-        )
+        ) from exc
 
 
 @query_router.get("/queries/", response_model=List[Query])
