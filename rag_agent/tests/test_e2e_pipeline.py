@@ -50,9 +50,9 @@ def test_full_rag_pipeline():
         ]
 
         assert len(mock_contexts) > 0, "Should retrieve contexts"
-        assert all(
-            "content" in ctx for ctx in mock_contexts
-        ), "Contexts should have content"
+        assert all("content" in ctx for ctx in mock_contexts), (
+            "Contexts should have content"
+        )
 
         # Step 3: Mock Generation
         mock_response = (
@@ -96,9 +96,9 @@ def test_cross_component_data_flow():
 
             # Verify metadata propagation
             for intent in query_plan.intents:
-                assert hasattr(
-                    intent, "extracted_info"
-                ), "Intent should have extracted_info"
+                assert hasattr(intent, "extracted_info"), (
+                    "Intent should have extracted_info"
+                )
                 assert hasattr(intent, "filters"), "Intent should have filters"
 
             # Mock retrieval with intent
@@ -156,12 +156,12 @@ def test_performance_benchmarks():
         avg_latency = total_time / len(test_queries)
         success_rate = successful_queries / len(test_queries)
 
-        assert (
-            success_rate >= 0.8
-        ), f"Success rate should be >= 80%, got {success_rate:.2%}"
-        assert (
-            avg_latency < max_latency
-        ), f"Average latency should be < {max_latency}s, got {avg_latency:.3f}s"
+        assert success_rate >= 0.8, (
+            f"Success rate should be >= 80%, got {success_rate:.2%}"
+        )
+        assert avg_latency < max_latency, (
+            f"Average latency should be < {max_latency}s, got {avg_latency:.3f}s"
+        )
 
         logger.info(
             f"✅ Performance benchmarks passed - Avg latency: {avg_latency:.3f}s, "
@@ -208,9 +208,9 @@ def test_error_recovery_scenarios():
                 mock_contexts = []
 
                 # Should handle errors gracefully
-                assert isinstance(
-                    mock_contexts, list
-                ), "Should return list even on errors"
+                assert isinstance(mock_contexts, list), (
+                    "Should return list even on errors"
+                )
 
             except Exception as e:
                 logger.warning(
@@ -260,9 +260,9 @@ def test_memory_usage():
         memory_increase = final_memory - initial_memory
 
         # Memory increase should be reasonable (< 100MB for 20 queries)
-        assert (
-            memory_increase < 100
-        ), f"Memory increase should be < 100MB, got {memory_increase:.1f}MB"
+        assert memory_increase < 100, (
+            f"Memory increase should be < 100MB, got {memory_increase:.1f}MB"
+        )
 
         logger.info(
             f"✅ Memory usage test passed - Memory increase: {memory_increase:.1f}MB"
@@ -321,9 +321,9 @@ def test_concurrent_requests():
 
         # Should have reasonable success rate
         success_rate = success_count / num_threads
-        assert (
-            success_rate >= 0.8
-        ), f"Concurrent success rate should be >= 80%, got {success_rate:.2%}"
+        assert success_rate >= 0.8, (
+            f"Concurrent success rate should be >= 80%, got {success_rate:.2%}"
+        )
 
         logger.info(
             f"✅ Concurrent requests test passed - Success rate: {success_rate:.2%}"

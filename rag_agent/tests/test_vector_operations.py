@@ -40,15 +40,15 @@ def test_embedding_generation():
 
         embeddings = mock_generate_embeddings(test_texts)
 
-        assert len(embeddings) == len(
-            test_texts
-        ), "Should generate embeddings for all texts"
-        assert all(
-            len(emb) == 1536 for emb in embeddings
-        ), "Should generate 1536-dimensional embeddings"
-        assert all(
-            isinstance(emb, list) for emb in embeddings
-        ), "Should return list of embeddings"
+        assert len(embeddings) == len(test_texts), (
+            "Should generate embeddings for all texts"
+        )
+        assert all(len(emb) == 1536 for emb in embeddings), (
+            "Should generate 1536-dimensional embeddings"
+        )
+        assert all(isinstance(emb, list) for emb in embeddings), (
+            "Should return list of embeddings"
+        )
 
         logger.info("✅ Embedding generation test passed")
         return True
@@ -85,12 +85,12 @@ def test_vector_similarity():
         sim_orthogonal = mock_cosine_similarity(vec1, vec2)
         sim_identical = mock_cosine_similarity(vec1, vec3)
 
-        assert (
-            abs(sim_orthogonal) < 0.1
-        ), "Orthogonal vectors should have low similarity"
-        assert (
-            abs(sim_identical - 1.0) < 0.1
-        ), "Identical vectors should have similarity ~1.0"
+        assert abs(sim_orthogonal) < 0.1, (
+            "Orthogonal vectors should have low similarity"
+        )
+        assert abs(sim_identical - 1.0) < 0.1, (
+            "Identical vectors should have similarity ~1.0"
+        )
 
         # Test with numpy arrays
         # import numpy as np  # Already imported at top
@@ -133,15 +133,15 @@ def test_weaviate_integration():
         results = mock_vector_search("machine learning", k=2)
 
         assert len(results) == 2, "Should return expected number of results"
-        assert all(
-            "chunk_id" in result for result in results
-        ), "Results should have chunk_id"
-        assert all(
-            "score" in result for result in results
-        ), "Results should have scores"
-        assert all(
-            "content" in result for result in results
-        ), "Results should have content"
+        assert all("chunk_id" in result for result in results), (
+            "Results should have chunk_id"
+        )
+        assert all("score" in result for result in results), (
+            "Results should have scores"
+        )
+        assert all("content" in result for result in results), (
+            "Results should have content"
+        )
 
         logger.info("✅ Weaviate integration test passed")
         return True
@@ -229,9 +229,9 @@ def test_vector_search_performance():
 
         assert len(results) == 5, "Should return requested number of results"
         assert search_time < 1.0, "Search should complete within reasonable time"
-        assert all(
-            "score" in result for result in results
-        ), "Results should have scores"
+        assert all("score" in result for result in results), (
+            "Results should have scores"
+        )
 
         logger.info("✅ Vector search performance test passed")
         return True

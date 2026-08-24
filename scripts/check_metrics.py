@@ -32,7 +32,7 @@ def check_metrics():
                         "rag_query_total",
                         "rag_pipeline_latency",
                         "rag_retrieval_hits",
-                        "http_requests_total",
+                        "rag_query_failures_total",
                     ]
                 ):
                     if not line.startswith("#"):

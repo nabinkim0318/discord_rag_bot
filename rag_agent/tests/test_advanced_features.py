@@ -33,9 +33,9 @@ def test_streaming_responses():
 
         # Verify streaming behavior
         assert len(stream_chunks) > 0, "Should produce streaming chunks"
-        assert all(
-            isinstance(chunk, str) for chunk in stream_chunks
-        ), "All chunks should be strings"
+        assert all(isinstance(chunk, str) for chunk in stream_chunks), (
+            "All chunks should be strings"
+        )
 
         # Verify content assembly
         full_response = "".join(stream_chunks)
@@ -280,9 +280,9 @@ def test_adaptive_learning():
         # Test performance prediction
         performance_prediction = learner.predict_performance("What is deep learning?")
 
-        assert isinstance(
-            performance_prediction, float
-        ), "Should return performance score"
+        assert isinstance(performance_prediction, float), (
+            "Should return performance score"
+        )
         assert 0 <= performance_prediction <= 1, "Performance should be between 0 and 1"
 
         logger.info("✅ Adaptive learning test passed")
@@ -415,9 +415,9 @@ def test_context_aware_routing():
             if "schedule" in case["query"].lower():
                 assert "schedule" in route.lower(), "Should route to schedule handler"
             elif "submit" in case["query"].lower():
-                assert (
-                    "submission" in route.lower()
-                ), "Should route to submission handler"
+                assert "submission" in route.lower(), (
+                    "Should route to submission handler"
+                )
             elif "resource" in case["query"].lower():
                 assert "resource" in route.lower(), "Should route to resource handler"
 

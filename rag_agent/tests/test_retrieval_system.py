@@ -66,12 +66,12 @@ def test_bm25_search():
             results = bm25_search("dummy_db_path", test_query, k=2)
 
         assert len(results) <= 2, "Should return at most k results"
-        assert all(
-            "score_bm25" in result for result in results
-        ), "Results should have BM25 scores"
-        assert all(
-            "chunk_id" in result for result in results
-        ), "Results should have chunk_ids"
+        assert all("score_bm25" in result for result in results), (
+            "Results should have BM25 scores"
+        )
+        assert all("chunk_id" in result for result in results), (
+            "Results should have chunk_ids"
+        )
 
         logger.info("✅ BM25 search test passed")
         return True
@@ -105,12 +105,12 @@ def test_vector_search():
         results = mock_vector_search(test_query, k=2)
 
         assert len(results) <= 2, "Should return at most k results"
-        assert all(
-            "score" in result for result in results
-        ), "Results should have scores"
-        assert all(
-            "content" in result for result in results
-        ), "Results should have content"
+        assert all("score" in result for result in results), (
+            "Results should have scores"
+        )
+        assert all("content" in result for result in results), (
+            "Results should have content"
+        )
 
         logger.info("✅ Vector search test passed")
         return True
@@ -149,12 +149,12 @@ def test_hybrid_search():
         results = mock_hybrid_search(test_query, k=3)
 
         assert len(results) <= 3, "Should return at most k results"
-        assert all(
-            "score" in result for result in results
-        ), "Results should have scores"
-        assert all(
-            "content" in result for result in results
-        ), "Results should have content"
+        assert all("score" in result for result in results), (
+            "Results should have scores"
+        )
+        assert all("content" in result for result in results), (
+            "Results should have content"
+        )
 
         logger.info("✅ Hybrid search test passed")
         return True
@@ -181,9 +181,9 @@ def test_rrf_combine():
         results = rrf_combine(lists, weights=weights, k=3)
 
         assert len(results) <= 3, "Should return at most k results"
-        assert all(
-            "score_rrf" in result for result in results
-        ), "Results should have RRF scores"
+        assert all("score_rrf" in result for result in results), (
+            "Results should have RRF scores"
+        )
 
         # Check that chunk_uid "1" appears in results (from both lists)
         chunk_uids = [result["chunk_uid"] for result in results]
@@ -215,9 +215,9 @@ def test_mmr_select():
         results = mmr_select(items, topn=2, lambda_=0.7)
 
         assert len(results) <= 2, "Should return at most k results"
-        assert all(
-            "chunk_id" in result for result in results
-        ), "Results should have chunk_ids"
+        assert all("chunk_id" in result for result in results), (
+            "Results should have chunk_ids"
+        )
 
         # Check diversity (MMR should select diverse items)
         selected_ids = [result["chunk_id"] for result in results]
@@ -265,12 +265,12 @@ def test_enhanced_retrieval():
         results = mock_enhanced_retrieval(query_plan, k=3)
 
         assert len(results) <= 3, "Should return at most k results"
-        assert all(
-            "score" in result for result in results
-        ), "Results should have scores"
-        assert all(
-            "content" in result for result in results
-        ), "Results should have content"
+        assert all("score" in result for result in results), (
+            "Results should have scores"
+        )
+        assert all("content" in result for result in results), (
+            "Results should have content"
+        )
 
         logger.info("✅ Enhanced retrieval test passed")
         return True

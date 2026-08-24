@@ -1,0 +1,9 @@
+# Loaded only when Prometheus is given the Discord scrape overlay.
+# Do not add this target to the default prometheus.yml — the bot runs
+# under Compose profile "discord" and is absent from default startup.
+scrape_configs:
+  - job_name: "discord-bot"
+    static_configs:
+      - targets: ["bot:9109"]
+    scrape_interval: 15s
+    scrape_timeout: 5s

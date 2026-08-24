@@ -110,9 +110,9 @@ def test_memory_usage():
         memory_increase = final_memory - initial_memory
 
         # Memory increase should be reasonable (< 200MB for 100 queries)
-        assert (
-            memory_increase < 200
-        ), f"Memory increase should be < 200MB, got {memory_increase:.1f}MB"
+        assert memory_increase < 200, (
+            f"Memory increase should be < 200MB, got {memory_increase:.1f}MB"
+        )
 
         logger.info(
             f"✅ Memory usage test passed - Memory increase: {memory_increase:.1f}MB"
@@ -279,9 +279,9 @@ def test_resource_limits():
 
                 # Should handle long queries gracefully
                 processing_time = end_time - start_time
-                assert (
-                    processing_time < 5.0
-                ), f"Long query {i} should process in < 5s, got {processing_time:.3f}s"
+                assert processing_time < 5.0, (
+                    f"Long query {i} should process in < 5s, got {processing_time:.3f}s"
+                )
 
             except Exception as e:
                 # Some failures are acceptable for extreme cases
@@ -299,9 +299,9 @@ def test_resource_limits():
             try:
                 query_plan = query_planner.plan_query(query)
                 # Should handle edge cases without crashing
-                assert isinstance(
-                    query_plan, object
-                ), f"Edge case {i} should return query plan"
+                assert isinstance(query_plan, object), (
+                    f"Edge case {i} should return query plan"
+                )
             except Exception as e:
                 # Some failures are acceptable for edge cases
                 logger.warning(f"Edge case {i} failed (acceptable): {e}")
@@ -337,9 +337,9 @@ def test_throughput_benchmarks():
         throughput = query_count / actual_duration
 
         # Should achieve reasonable throughput (> 10 queries/sec)
-        assert (
-            throughput > 10
-        ), f"Throughput should be > 10 queries/sec, got {throughput:.2f}"
+        assert throughput > 10, (
+            f"Throughput should be > 10 queries/sec, got {throughput:.2f}"
+        )
 
         logger.info(f"✅ Throughput benchmarks passed - {throughput:.2f} queries/sec")
         return True

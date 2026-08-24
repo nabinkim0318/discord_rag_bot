@@ -58,9 +58,9 @@ def test_text_normalization():
 
             # Check excluded content
             for excluded in case["expected_not_contains"]:
-                assert (
-                    excluded not in result
-                ), f"Case {i}: Did not expect '{excluded}' in result"
+                assert excluded not in result, (
+                    f"Case {i}: Did not expect '{excluded}' in result"
+                )
 
         logger.info("✅ Text normalization test passed")
         return True
@@ -96,9 +96,9 @@ def test_link_extraction():
         for i, case in enumerate(test_cases):
             links = chunker._extract_links(case["text"])
 
-            assert (
-                len(links) == case["expected_count"]
-            ), f"Case {i}: Expected {case['expected_count']} links, got {len(links)}"
+            assert len(links) == case["expected_count"], (
+                f"Case {i}: Expected {case['expected_count']} links, got {len(links)}"
+            )
 
             if "expected_url" in case:
                 # _extract_links returns list of dicts with 'url' key
@@ -133,9 +133,9 @@ def test_metadata_extraction():
         for text, expected in audience_cases:
             result = chunker._extract_audience(text)
             if expected:
-                assert (
-                    expected in result
-                ), f"Expected '{expected}' in audience extraction for '{text}'"
+                assert expected in result, (
+                    f"Expected '{expected}' in audience extraction for '{text}'"
+                )
 
         # Test week extraction
         week_cases = [
@@ -148,9 +148,9 @@ def test_metadata_extraction():
             result = chunker._extract_week(text)
             if expected:
                 # _extract_week returns integer or None, not list
-                assert (
-                    result == expected
-                ), f"Expected week {expected}, got {result} for '{text}'"
+                assert result == expected, (
+                    f"Expected week {expected}, got {result} for '{text}'"
+                )
 
         logger.info("✅ Metadata extraction test passed")
         return True
@@ -193,9 +193,9 @@ def test_document_type_detection():
 
         for i, case in enumerate(test_cases):
             result = chunker._detect_doc_type(case["text"])
-            assert (
-                result == case["expected"]
-            ), f"Case {i}: Expected '{case['expected']}', got '{result}'"
+            assert result == case["expected"], (
+                f"Case {i}: Expected '{case['expected']}', got '{result}'"
+            )
 
         logger.info("✅ Document type detection test passed")
         return True

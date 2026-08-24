@@ -1,0 +1,8 @@
+# Overlay: scrape Discord bot metrics when the discord profile is enabled.
+# Default `docker compose up` does not scrape bot:9109.
+# Enable bot + scrape together:
+#   docker compose --profile discord -f docker-compose.yaml -f docker-compose.discord.yaml up
+services:
+  prometheus:
+    volumes:
+      - ./ops/prometheus/scrape.d.discord:/etc/prometheus/scrape.d:ro
