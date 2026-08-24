@@ -57,7 +57,7 @@ def run_enhanced_rag_pipeline(
     record_rag_request("/api/v1/enhanced-rag/")
 
     try:
-        logger.info(f"Enhanced RAG: Processing query: {query[:100]}...")
+        logger.info("Enhanced RAG: processing query")
 
         if not RAG_AGENT_AVAILABLE:
             raise RAGException(
@@ -88,8 +88,6 @@ def run_enhanced_rag_pipeline(
         total_time = time.time() - start_time
         enhanced_metadata = {
             "total_time": total_time,
-            "user_id": user_id,
-            "channel_id": channel_id,
             "request_id": request_id,
             "pipeline": "enhanced_rag",
             "rag_agent_available": True,
@@ -101,13 +99,12 @@ def run_enhanced_rag_pipeline(
 
         record_rag_pipeline_latency(total_time)
         log_rag_operation(
-            query,
-            True,
-            total_time,
-            len(contexts),
-            user_id,
-            channel_id,
-            request_id,
+            success=True,
+            duration=total_time,
+            contexts_count=len(contexts),
+            request_id=request_id,
+            query_length=len(query),
+            endpoint="/api/v1/enhanced-rag/",
         )
         logger.info(
             f"Enhanced RAG completed in {total_time:.3f}s with {len(contexts)} contexts"
@@ -117,12 +114,26 @@ def run_enhanced_rag_pipeline(
     except (ExternalServiceException, RAGException):
         total_time = time.time() - start_time
         record_rag_pipeline_latency(total_time)
-        log_rag_operation(query, False, total_time, 0, user_id, channel_id, request_id)
+        log_rag_operation(
+            success=False,
+            duration=total_time,
+            contexts_count=0,
+            request_id=request_id,
+            query_length=len(query),
+            endpoint="/api/v1/enhanced-rag/",
+        )
         raise
     except Exception as exc:
         total_time = time.time() - start_time
         record_rag_pipeline_latency(total_time)
-        log_rag_operation(query, False, total_time, 0, user_id, channel_id, request_id)
+        log_rag_operation(
+            success=False,
+            duration=total_time,
+            contexts_count=0,
+            request_id=request_id,
+            query_length=len(query),
+            endpoint="/api/v1/enhanced-rag/",
+        )
         logger.exception("Enhanced RAG pipeline failed")
         raise RAGException(
             "RAG service is temporarily unavailable",

@@ -346,7 +346,6 @@ discord_rag_bot/
 
 - `POST /api/v1/feedback/submit` - Submit user feedback
 - `GET /api/v1/feedback/stats/{query_id}` - Get feedback statistics
-- `GET /api/v1/feedback/history/{user_id}` - User feedback history
 - `GET /api/v1/feedback/summary` - Overall feedback summary
 
 ### Health Endpoints

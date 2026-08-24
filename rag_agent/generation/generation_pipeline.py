@@ -59,6 +59,7 @@ def generate_answer(
 
     # 2) (optional) rerank
     hits = maybe_rerank(query, hits, reranker)
+    rerank_applied = any("rerank_score" in hit for hit in hits)
 
     # 3) context packing
     chosen, pack_meta = pack_contexts(
@@ -86,7 +87,8 @@ def generate_answer(
         "retrieval": {
             "num_candidates": len(hits),
             "k_final": k_final,
-            "reranker": reranker,
+            "reranker": reranker if rerank_applied else None,
+            "reranker_requested": reranker,
             "bm25_weight": bm25_weight,
             "vec_weight": vec_weight,
             "mmr_lambda": mmr_lambda,

@@ -3,7 +3,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from time import time
 from typing import AsyncGenerator
-from uuid import uuid4
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
@@ -15,6 +14,7 @@ from app.core.config import settings
 from app.core.error_handlers import setup_error_handlers
 from app.core.logging import log_api_request, logger
 from app.core.metrics import instrumentator
+from app.core.request_id import canonical_request_id
 from app.db.schema import apply_schema
 from app.db.session import engine
 from app.models import (  # noqa: F401 ensure table registration
@@ -89,40 +89,33 @@ if settings.METRICS_ENABLED:
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time()
-    request_id = str(uuid4())
-    user_id = request.headers.get("X-User-ID", "anonymous")
-    channel_id = request.headers.get("X-Channel-ID", "unknown")
+    request_id = canonical_request_id(request.headers.get("X-Request-ID"))
+    request.state.request_id = request_id
 
-    # Request start logging
-    logger.bind(request_id=request_id, user_id=user_id, channel_id=channel_id).info(
-        f"Request started: {request.method} {request.url.path} \
-        | User: {user_id} | Channel: {channel_id} | RequestID: {request_id}"
+    logger.bind(request_id=request_id).info(
+        f"Request started: {request.method} {request.url.path} "
+        f"| RequestID: {request_id}"
     )
 
     try:
         response = await call_next(request)
         duration = time() - start_time
+        response.headers["X-Request-ID"] = request_id
 
-        # API request logging (improved logging function)
         log_api_request(
             method=request.method,
             path=request.url.path,
             status_code=response.status_code,
             duration=duration,
-            user_id=user_id,
-            channel_id=channel_id,
             request_id=request_id,
         )
 
         return response
 
-    except Exception as e:
+    except Exception as exc:
         duration = time() - start_time
-        logger.bind(
-            request_id=request_id, user_id=user_id, channel_id=channel_id
-        ).error(
-            f"Request failed: {request.method} {request.url.path} \
-            | User: {user_id} | Channel: {channel_id} | Duration: {duration:.3f}s \
-            | Error: {str(e)}"
+        logger.bind(request_id=request_id).error(
+            f"Request failed: {request.method} {request.url.path} "
+            f"| Duration: {duration:.3f}s | ErrorType: {type(exc).__name__}"
         )
         raise

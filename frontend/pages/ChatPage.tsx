@@ -5,11 +5,25 @@ import ChatMessage from "./ChatMessage";
 import FeedbackButtons from "./FeedbackButtons";
 import LoadingMessage from "./LoadingMessage";
 
+type FeedbackStatus = "idle" | "submitting" | "success" | "error";
+
 export default function ChatPage() {
   const { messages, loading, sendMessage, retryLast, error, setError } =
     useChat();
   const [input, setInput] = useState("");
+  const [feedbackStatus, setFeedbackStatus] = useState<FeedbackStatus>("idle");
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const feedbackLockRef = useRef(false);
+
+  const lastBot = [...messages].reverse().find((msg) => msg.role === "bot");
+  const lastQueryId = lastBot?.queryId ?? null;
+
+  useEffect(() => {
+    setFeedbackStatus("idle");
+    setFeedbackSubmitted(false);
+    feedbackLockRef.current = false;
+  }, [lastQueryId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -32,13 +46,41 @@ export default function ChatPage() {
     }
   };
 
-  const handleFeedback = (type: "like" | "dislike" | "retry") => {
+  const handleFeedback = async (type: "like" | "dislike" | "retry") => {
     if (type === "retry") {
       retryLast();
       return;
     }
-    // TODO: send feedback to backend
-    console.log("Feedback:", type);
+    if (feedbackLockRef.current || feedbackSubmitted) {
+      return;
+    }
+    if (!lastQueryId) {
+      setFeedbackStatus("error");
+      return;
+    }
+
+    feedbackLockRef.current = true;
+    setFeedbackStatus("submitting");
+    try {
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query_id: lastQueryId,
+          score: type === "like" ? "up" : "down",
+        }),
+      });
+      if (!response.ok) {
+        feedbackLockRef.current = false;
+        setFeedbackStatus("error");
+        return;
+      }
+      setFeedbackSubmitted(true);
+      setFeedbackStatus("success");
+    } catch {
+      feedbackLockRef.current = false;
+      setFeedbackStatus("error");
+    }
   };
 
   return (
@@ -68,6 +110,8 @@ export default function ChatPage() {
                 <FeedbackButtons
                   onFeedback={handleFeedback}
                   queryId={msg.queryId}
+                  disabled={feedbackSubmitted}
+                  status={feedbackStatus}
                 />
               )}
             </div>

@@ -13,6 +13,7 @@ from sqlmodel import Session
 from app.api.v1.health import assess_readiness
 from app.core.exceptions import ExternalServiceException, RAGException
 from app.core.metrics import record_failure_metric
+from app.core.request_id import get_request_id
 from app.db.session import get_session
 from app.models.rag import RAGQueryRequest, RAGQueryResponse
 from app.services.enhanced_rag_service import run_enhanced_rag_pipeline
@@ -23,7 +24,7 @@ enhanced_rag_router = APIRouter(prefix="/api/v1/enhanced-rag", tags=["Enhanced R
 
 
 @enhanced_rag_router.post("/", response_model=RAGQueryResponse)
-async def enhanced_query_rag(request: RAGQueryRequest, http_request: Request):
+def enhanced_query_rag(request: RAGQueryRequest, http_request: Request):
     """
     Enhanced RAG query processing
 
@@ -32,17 +33,11 @@ async def enhanced_query_rag(request: RAGQueryRequest, http_request: Request):
     - Discord-optimized response generation
     """
     try:
-        # Extract user information from headers
-        user_id = http_request.headers.get("X-User-ID")
-        channel_id = http_request.headers.get("X-Channel-ID")
-        request_id = http_request.headers.get("X-Request-ID")
+        request_id = get_request_id(http_request)
 
-        # Run enhanced RAG pipeline
         answer, contexts, metadata = run_enhanced_rag_pipeline(
             query=request.query,
-            top_k=request.top_k or 5,
-            user_id=user_id,
-            channel_id=channel_id,
+            top_k=request.top_k,
             request_id=request_id,
         )
 
@@ -77,7 +72,7 @@ async def enhanced_query_rag(request: RAGQueryRequest, http_request: Request):
 
 
 @enhanced_rag_router.get("/health")
-async def enhanced_rag_health(session: Session = Depends(get_session)):
+def enhanced_rag_health(session: Session = Depends(get_session)):
     """Compatibility readiness wrapper. Uses the canonical /readyz assessment.
 
     Does not run a RAG query or contact an LLM. Metrics are owned by /readyz.

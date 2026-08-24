@@ -88,7 +88,7 @@ class TestEnhancedRAGService:
 
         assert exc_info.value.error_code == "ENHANCED_RAG_PIPELINE_ERROR"
         assert "RAG error" not in exc_info.value.message
-        assert mock_log.call_args.args[1] is False
+        assert mock_log.call_args.kwargs["success"] is False
         mock_hit.assert_not_called()
 
     def test_run_enhanced_rag_pipeline_with_user_context(self):

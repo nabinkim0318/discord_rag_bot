@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request
 
 from app.core.exceptions import ExternalServiceException, RAGException
 from app.core.metrics import record_failure_metric
+from app.core.request_id import get_request_id
 from app.models.rag import RAGQueryRequest, RAGQueryResponse
 from app.services.rag_service import run_rag_pipeline
 
@@ -13,17 +14,13 @@ rag_router = APIRouter(prefix="/api/v1/rag", tags=["RAG"])
 
 
 @rag_router.post("/", response_model=RAGQueryResponse)
-async def query_rag(request: RAGQueryRequest, http_request: Request):
+def query_rag(request: RAGQueryRequest, http_request: Request):
     try:
-        user_id = http_request.headers.get("X-User-ID")
-        channel_id = http_request.headers.get("X-Channel-ID")
-        request_id = http_request.headers.get("X-Request-ID")
+        request_id = get_request_id(http_request)
 
         answer, contexts, metadata = run_rag_pipeline(
             request.query,
-            request.top_k or 5,
-            user_id=user_id,
-            channel_id=channel_id,
+            request.top_k,
             request_id=request_id,
         )
         return {

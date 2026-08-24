@@ -76,16 +76,15 @@ async def test_feedback_service():
         except Exception as e:
             print(f"❌ Stats failed: {e}")
 
-        # Test 5: Get user feedback history
-        print("\n5. Testing user feedback history...")
+        # Test 5: User feedback history is not publicly enumerable
+        print("\n5. User feedback history endpoint is not public...")
         try:
             response = await client.get(
                 f"{BACKEND_BASE}/api/v1/feedback/history/test-user-456"
             )
-            print(f"✅ History: {response.status_code}")
-            print(f"   Response: {response.json()}")
+            print(f"   Status: {response.status_code}")
         except Exception as e:
-            print(f"❌ History failed: {e}")
+            print(f"❌ History probe failed: {e}")
 
 
 if __name__ == "__main__":

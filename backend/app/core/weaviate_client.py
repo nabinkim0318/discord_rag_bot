@@ -186,9 +186,7 @@ class WeaviateClient:
                             "distance": item["_additional"]["distance"],
                         }
                     )
-            logger.info(
-                f"Found {len(documents)} similar documents for query: '{query[:50]}...'"
-            )
+            logger.info("Found {} similar documents", len(documents))
             return documents
         except Exception as e:
             logger.error(f"Failed to search Weaviate: {str(e)}")
