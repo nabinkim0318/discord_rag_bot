@@ -85,6 +85,12 @@ jobs:
       - name: Run Tests (RAG Agent)
         run: poetry run pytest
 
+      - name: Demo retrieval evaluation smoke
+        working-directory: ${{ github.workspace }}
+        run: |
+          unset OPENAI_API_KEY AZURE_OPENAI_API_KEY WEAVIATE_URL WEAVIATE_API_KEY || true
+          make eval-rag-demo
+
   # Job 3: Frontend Testing and Linting
   frontend:
     name: Frontend (React/Next.js)

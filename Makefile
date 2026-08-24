@@ -151,15 +151,48 @@ run-rag:
 run-frontend:
 	cd frontend && npm run dev
 
-# ======== RAG Evaluation ========
+# ======== RAG retrieval evaluation ========
+# Public path is offline BM25 over the committed demo corpus.
+# Hybrid evaluation is optional and requires Weaviate + embeddings.
 
-eval-rag:
-	cd rag_agent && poetry run python evaluation/cli_eval.py --input data/test_dataset.json --prompt-version v1.1
+.PHONY: eval-rag-demo-index eval-rag-demo eval-rag-hybrid
 
-eval-rag-all:
-	cd rag_agent && poetry run python evaluation/cli_eval.py --input data/test_dataset.json --prompt-version v1.0
-	cd rag_agent && poetry run python evaluation/cli_eval.py --input data/test_dataset.json --prompt-version v1.1
-	cd rag_agent && poetry run python evaluation/cli_eval.py --input data/test_dataset.json --prompt-version v2.0
+# Inherited PYTHONHOME (and related prefix vars) can make Poetry or the
+# project env look for encodings in a removed conda/miniconda prefix.
+# Drop those only at this boundary. PYTHONPATH=.. is the intentional
+# repo-root import path after `cd rag_agent`.
+RAG_POETRY = env -u PYTHONHOME -u PYTHONSTARTUP -u PYTHONUSERBASE -u PYTHONEXECUTABLE -u PYTHONPATH
+RAG_EVAL_PYTHON = cd rag_agent && $(RAG_POETRY) PYTHONPATH=.. poetry run python
+DEMO_GOLD = demo/gold.jsonl
+DEMO_SQLITE = .demo/demo_kb.sqlite3
+DEMO_EVAL_OUT = .demo/evaluation_results
+
+eval-rag-demo-index:
+	$(RAG_EVAL_PYTHON) -m rag_agent.evaluation.index_demo --sqlite $(DEMO_SQLITE) --corpus demo/corpus
+
+eval-rag-demo: eval-rag-demo-index
+	$(RAG_EVAL_PYTHON) -m rag_agent.evaluation.cli_eval \
+		--gold $(DEMO_GOLD) \
+		--sqlite $(DEMO_SQLITE) \
+		--mode bm25 \
+		--out-dir $(DEMO_EVAL_OUT) \
+		--ndcg-threshold 0.5 \
+		--hit-rate-threshold 0.8 \
+		--no-latency-gate \
+		--fail-fast-uid true \
+		--use-rerank false
+
+# Optional. Not used in CI. Requires a Weaviate-backed index and embeddings.
+# EVAL_GOLD and EVAL_SQLITE must be paths relative to rag_agent/ or absolute.
+eval-rag-hybrid:
+	@test -n "$(EVAL_GOLD)" || (echo "Set EVAL_GOLD to a retrieval gold JSONL (path relative to rag_agent/ or absolute)." && exit 1)
+	@test -n "$(EVAL_SQLITE)" || (echo "Set EVAL_SQLITE to the sqlite path of a hybrid (sqlite+Weaviate) index." && exit 1)
+	$(RAG_EVAL_PYTHON) -m rag_agent.evaluation.cli_eval \
+		--gold "$(EVAL_GOLD)" \
+		--sqlite "$(EVAL_SQLITE)" \
+		--mode hybrid \
+		--out-dir $${EVAL_OUT_DIR:-.demo/hybrid_evaluation_results} \
+		--fail-fast-uid true
 
 # ======== Maintenance ========
 

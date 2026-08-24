@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional
 from rag_agent.retrieval.fuse import rrf_combine, score_fuse
 from rag_agent.retrieval.keyword import bm25_search
 from rag_agent.retrieval.rerank import rerank_cross_encoder
-from rag_agent.retrieval.vector import vector_search
 
 # Defensive import - prevent crashes when running without backend
 try:
@@ -250,6 +249,9 @@ def search_hybrid(
     # weights for RRF combination
     bm25_weight: float = 0.2,
     vec_weight: float = 0.8,
+    # vector retrieval can be skipped for sqlite/BM25-only evaluation
+    enable_vector: bool = True,
+    require_vector: bool = False,
     # metrics/options
     record_latency: bool = True,
     metrics_endpoint: str = "/api/v1/rag/retrieval",
@@ -271,15 +273,22 @@ def search_hybrid(
         log.exception("bm25_search failed, %s", e)
         bm = []
 
-    # ── Vector
-    try:
-        ve = vector_search(
-            query, k=k_vec, filters=weaviate_filters, embed_model=embed_model
-        )
-    except Exception as e:
-        record_failure_metric(metrics_endpoint, "vector_search_error")
-        log.exception("vector_search failed, %s", e)
-        ve = []
+    # ── Vector (optional). When disabled, BM25/SQLite is the intended path;
+    # do not call Weaviate or embeddings, and do not log a vector failure.
+    ve: List[Dict] = []
+    if enable_vector:
+        from rag_agent.retrieval.vector import vector_search
+
+        try:
+            ve = vector_search(
+                query, k=k_vec, filters=weaviate_filters, embed_model=embed_model
+            )
+        except Exception as e:
+            record_failure_metric(metrics_endpoint, "vector_search_error")
+            log.exception("vector_search failed, %s", e)
+            if require_vector:
+                raise
+            ve = []
 
     # log: top 3 of each
     def _peek(name, arr, key):

@@ -7,9 +7,10 @@ import random
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from rag_agent.core.logging import logger
+from rag_agent.evaluation.gold import load_gold_jsonl
 from rag_agent.evaluation.metrics import (
     ap_at_k,
     mrr_at_k,
@@ -18,7 +19,6 @@ from rag_agent.evaluation.metrics import (
     recall_at_k,
 )
 from rag_agent.indexing.sqlite_fts import uid_exists as _fts_uid_exists
-from rag_agent.indexing.weaviate_index import fetch_by_chunk_uid as _weav_fetch
 from rag_agent.retrieval.retrieval_pipeline import search_hybrid
 
 
@@ -34,15 +34,21 @@ class EvaluationConfig:
     max_cases: Optional[int] = None  # When sampling evaluation
     out_dir: str = "rag_agent/evaluation_results"
     # evaluation thresholds
-    ndcg_threshold: float = 0.4  # relaxed initial threshold
-    hit_rate_threshold: float = 0.5  # relaxed initial threshold
-    latency_threshold_ms: float = 1000.0  # latency threshold
+    ndcg_threshold: float = 0.4
+    hit_rate_threshold: float = 0.5
+    latency_threshold_ms: float = 1000.0
+    enforce_latency: bool = True
     # retrieval options
     use_rerank: bool = False
+    rerank_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     use_mmr: bool = False
     preselect_topn: int = 50
     per_doc_cap: int = 3
     rrf_c: int = 15
+    # bm25 = sqlite/FTS only; hybrid = sqlite + vector/Weaviate
+    retrieval_mode: str = "hybrid"
+    enable_vector: bool = True
+    require_vector: bool = False
 
 
 @dataclass
@@ -50,7 +56,7 @@ class CaseResult:
     qid: str
     question: str
     k: int
-    retrieved: List[Dict[str, Any]]  # top-k original results (needed fields)
+    retrieved: List[Dict[str, Any]]
     ranked_uids: List[str]
     relevant_uids: List[str]
     p_at_k: float
@@ -72,18 +78,16 @@ class EvalSummary:
     mrr_at_k_mean: float
     map_at_k_mean: float
     avg_latency_ms: float
-    hit_rate: float  # top-k contains relevant
-    # threshold and pass/fail results
-    ndcg_threshold: float = 0.6  # default threshold
-    passed: bool = False  # whether evaluation passed
-    failure_reason: Optional[str] = None  # reason for failure if any
+    hit_rate: float
+    ndcg_threshold: float = 0.6
+    hit_rate_threshold: float = 0.5
+    retrieval_mode: str = "hybrid"
+    passed: bool = False
+    failure_reason: Optional[str] = None
 
 
 def _apply_filters_to_hybrid_args(filters: Optional[Dict[str, Any]]):
-    """
-    gold filters to parameters for BM25/Weaviate
-    now source=... only one example
-    """
+    """gold filters to parameters for BM25/Weaviate; source=... is the example."""
     where_fts = None
     weav_where = None
     if filters and filters.get("source"):
@@ -97,165 +101,126 @@ def _apply_filters_to_hybrid_args(filters: Optional[Dict[str, Any]]):
     return where_fts, weav_where
 
 
+def _check_uids_exist(cfg: EvaluationConfig, uids: List[str]) -> Dict[str, bool]:
+    exist_map: Dict[str, bool] = {}
+    if not uids:
+        return exist_map
+    for uid in uids:
+        try:
+            exist_map[uid] = _fts_uid_exists(cfg.sqlite_path, uid)
+        except Exception:
+            exist_map[uid] = False
+    missing = [uid for uid, ok in exist_map.items() if not ok]
+    if missing and cfg.enable_vector:
+        try:
+            from rag_agent.indexing.weaviate_index import (
+                fetch_by_chunk_uid as weav_fetch,
+            )
+
+            got = weav_fetch(missing)
+            for uid in missing:
+                if uid in got:
+                    exist_map[uid] = True
+        except Exception:
+            pass
+    return exist_map
+
+
 def run_evaluation(
     gold_path: str, cfg: EvaluationConfig
 ) -> Tuple[List[CaseResult], EvalSummary]:
     os.makedirs(cfg.out_dir, exist_ok=True)
 
-    # load gold with validation
-    cases = []
-    skipped_count = 0
-    with open(gold_path, "r", encoding="utf-8") as f:
-        for line_num, line in enumerate(f, 1):
-            if not line.strip():
-                continue
-            try:
-                case = json.loads(line)
-                # Validate required fields
-                if "qid" not in case:
-                    logger.warning(
-                        f"Warning: Skipping line {line_num} - missing 'qid' field"
-                    )
-                    skipped_count += 1
-                    continue
-                if "question" not in case:
-                    logger.warning(
-                        f"Warning: Skipping line {line_num} - missing 'question' field"
-                    )
-                    skipped_count += 1
-                    continue
-                if "relevant_uids" not in case:
-                    logger.warning(
-                        f"Warning: Skipping line {line_num} - "
-                        "missing 'relevant_uids' field"
-                    )
-                    skipped_count += 1
-                    continue
-                cases.append(case)
-            except json.JSONDecodeError as e:
-                logger.warning(f"Warning: Skipping line {line_num} - invalid JSON: {e}")
-                skipped_count += 1
-                continue
-
-    if skipped_count > 0:
-        logger.warning(f"Warning: Skipped {skipped_count} invalid lines from gold data")
-
-    if not cases:
-        raise ValueError("No valid cases found in gold data")
+    cases = load_gold_jsonl(gold_path)
 
     if cfg.max_cases:
         random.seed(42)
         cases = random.sample(cases, k=min(cfg.max_cases, len(cases)))
 
     per_case: List[CaseResult] = []
-    ranked_list_all: List[List[str]] = []
-    relevant_all: List[Set[str]] = []
     latencies: List[int] = []
     hit_count = 0
 
-    # Gold UID existence check (to detect structural misses)
     all_rel_uids: List[str] = []
-    for c0 in cases:
-        all_rel_uids += c0.get("relevant_uids", [])
-    unique_rel_uids = list({u for u in all_rel_uids if u})
-
-    exist_map: Dict[str, bool] = {}
-    if unique_rel_uids:
-        # Fast FTS check
-        for u in unique_rel_uids:
-            try:
-                ok = _fts_uid_exists(cfg.sqlite_path, u)
-            except Exception:
-                ok = False
-            exist_map[u] = ok
-        # Weaviate fallback check for missing
-        missing = [u for u, ok in exist_map.items() if not ok]
-        try:
-            if missing:
-                got = _weav_fetch(missing)
-                for u in missing:
-                    if u in got:
-                        exist_map[u] = True
-        except Exception:
-            # ignore weaviate failures in eval
-            pass
-
+    for case0 in cases:
+        all_rel_uids += case0.get("relevant_uids", [])
+    unique_rel_uids = list({uid for uid in all_rel_uids if uid})
+    exist_map = _check_uids_exist(cfg, unique_rel_uids)
     uid_missing_rate = (
         sum(1 for _, ok in exist_map.items() if not ok) / max(1, len(exist_map))
         if exist_map
         else 0.0
     )
-    if exist_map:
+    if exist_map and uid_missing_rate > 0:
         logger.warning(f"[gold] uid_missing_rate={uid_missing_rate:.3f}")
 
-    for c in cases:
-        qid = c["qid"]
-        q = c["question"]
-        rel_uids = set(c.get("relevant_uids", []))
-        k_final = max(1, int(c.get("k", cfg.k_final)))  # Ensure k_final >= 1
-        filters = c.get("filters")
+    for case in cases:
+        qid = case["qid"]
+        question = case["question"]
+        rel_uids = set(case.get("relevant_uids", []))
+        k_final = max(1, int(case.get("k", cfg.k_final)))
+        filters = case.get("filters")
 
-        where_fts, weav_where = _apply_filters_to_hybrid_args(filters)
+        _fts_where, weav_where = _apply_filters_to_hybrid_args(filters)
 
         t0 = time.perf_counter()
         hits = search_hybrid(
-            q,
+            question,
             db_path=cfg.sqlite_path,
             k_bm25=cfg.k_bm25,
             k_vec=cfg.k_vec,
             top_k_final=k_final,
             sqlite_filters=filters if filters else None,
-            weaviate_filters=weav_where,
+            weaviate_filters=weav_where if cfg.enable_vector else None,
             mmr_lambda=cfg.mmr_lambda,
             bm25_weight=cfg.bm25_weight,
             vec_weight=cfg.vec_weight,
             use_rerank=cfg.use_rerank,
+            rerank_model=cfg.rerank_model,
             use_mmr=cfg.use_mmr,
             preselect_topn=cfg.preselect_topn,
             per_doc_cap=cfg.per_doc_cap,
             rrf_c=cfg.rrf_c,
+            enable_vector=cfg.enable_vector,
+            require_vector=cfg.require_vector,
         )
         latency_ms = int((time.perf_counter() - t0) * 1000)
 
-        ranked_uids = [h["chunk_uid"] for h in hits]
-        p = precision_at_k(ranked_uids, rel_uids, k_final)
-        r = recall_at_k(ranked_uids, rel_uids, k_final)
-        n = ndcg_at_k(ranked_uids, rel_uids, k_final)
+        ranked_uids = [hit["chunk_uid"] for hit in hits]
+        precision = precision_at_k(ranked_uids, rel_uids, k_final)
+        recall = recall_at_k(ranked_uids, rel_uids, k_final)
+        ndcg = ndcg_at_k(ranked_uids, rel_uids, k_final)
         mrr = mrr_at_k(ranked_uids, rel_uids, k_final)
         ap = ap_at_k(ranked_uids, rel_uids, k_final)
 
         if any(uid in rel_uids for uid in ranked_uids[:k_final]):
             hit_count += 1
 
-        # add debug note for quick diagnostics
         top1 = hits[0] if hits else {}
         note = (
             f"top1_doc={top1.get('doc_id')}/{top1.get('source')} "
             f"gold={{{','.join(sorted(set(u.split('#')[0] for u in rel_uids)))}}}"
         )
 
-        case = CaseResult(
+        result = CaseResult(
             qid=qid,
-            question=q,
+            question=question,
             k=k_final,
             retrieved=hits,
             ranked_uids=ranked_uids,
             relevant_uids=list(rel_uids),
-            p_at_k=p,
-            r_at_k=r,
-            ndcg_at_k=n,
+            p_at_k=precision,
+            r_at_k=recall,
+            ndcg_at_k=ndcg,
             mrr_at_k=mrr,
             ap_at_k=ap,
             latency_ms=latency_ms,
             filters=filters,
             notes=note,
         )
-        per_case.append(case)
-        ranked_list_all.append(ranked_uids)
-        relevant_all.append(rel_uids)
+        per_case.append(result)
         latencies.append(latency_ms)
 
-    # summary
     def mean(xs: List[float]) -> float:
         return (sum(xs) / len(xs)) if xs else 0.0
 
@@ -267,7 +232,6 @@ def run_evaluation(
     lat_mean = mean(latencies)
     hit_rate = hit_count / len(per_case) if per_case else 0.0
 
-    # threshold check
     passed = True
     failure_reasons = []
 
@@ -281,13 +245,14 @@ def run_evaluation(
             f"Hit rate {hit_rate:.3f} < threshold {cfg.hit_rate_threshold}"
         )
 
-    if lat_mean > cfg.latency_threshold_ms:
+    if cfg.enforce_latency and lat_mean > cfg.latency_threshold_ms:
         passed = False
         failure_reasons.append(
             f"Latency {lat_mean:.1f}ms > threshold {cfg.latency_threshold_ms}ms"
         )
 
     if uid_missing_rate > 0:
+        passed = False
         failure_reasons.append(f"gold uid_missing_rate={uid_missing_rate:.3f}")
 
     summary = EvalSummary(
@@ -300,6 +265,8 @@ def run_evaluation(
         avg_latency_ms=lat_mean,
         hit_rate=hit_rate,
         ndcg_threshold=cfg.ndcg_threshold,
+        hit_rate_threshold=cfg.hit_rate_threshold,
+        retrieval_mode=cfg.retrieval_mode,
         passed=passed,
         failure_reason="; ".join(failure_reasons) if failure_reasons else None,
     )
@@ -311,21 +278,19 @@ def dump_results(
 ) -> Dict[str, str]:
     Path(out_dir).mkdir(parents=True, exist_ok=True)
 
-    # Use ISO-like timestamp format with timezone
     from datetime import datetime, timezone
 
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%SZ")
 
     per_case_path = os.path.join(out_dir, f"cases_{ts}.jsonl")
     with open(per_case_path, "w", encoding="utf-8") as fo:
-        for c in per_case:
-            fo.write(json.dumps(asdict(c), ensure_ascii=False) + "\n")
+        for case in per_case:
+            fo.write(json.dumps(asdict(case), ensure_ascii=False) + "\n")
 
     summary_path = os.path.join(out_dir, f"summary_{ts}.json")
     with open(summary_path, "w", encoding="utf-8") as fo:
         json.dump(asdict(summary), fo, indent=2)
 
-    # CI/Grafana summary metric file (scrape/parse easily)
     metrics_path = os.path.join(out_dir, "evaluation_metrics.json")
     metrics = {
         "rag_eval_total": summary.total,
@@ -336,11 +301,11 @@ def dump_results(
         "rag_eval_map_at_k": summary.map_at_k_mean,
         "rag_eval_hit_rate": summary.hit_rate,
         "rag_eval_avg_latency_ms": summary.avg_latency_ms,
-        # threshold and pass/fail results
         "rag_eval_ndcg_threshold": summary.ndcg_threshold,
+        "rag_eval_hit_rate_threshold": summary.hit_rate_threshold,
+        "rag_eval_retrieval_mode": summary.retrieval_mode,
         "rag_eval_passed": summary.passed,
         "rag_eval_failure_reason": summary.failure_reason,
-        # CI-friendly pass/fail status
         "rag_eval_status": "PASS" if summary.passed else "FAIL",
     }
     with open(metrics_path, "w", encoding="utf-8") as fo:
