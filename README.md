@@ -1,636 +1,209 @@
-# Discord RAG Platform
+# Discord RAG Bot
 
-A full-stack Retrieval-Augmented Generation (RAG) system with a **FastAPI backend, hybrid retrieval pipeline, Discord interface, Next.js frontend, containerized services, and observability stack**.
+Local-first RAG assistant for Discord and a small web UI. A FastAPI service retrieves from **SQLite FTS (BM25)** and **Weaviate**, fuses the two lists, optionally reranks, then asks an LLM to answer only from that context.
 
-The project explores how to build a RAG application as an operable software system—not only a retrieval prototype—by incorporating APIs, persistence, health checks, metrics, structured logging, testing, container orchestration, and user feedback.
+This is a **portfolio / local-development** system. It is not a hosted product, not a Kubernetes deployment, and GitHub Actions here is **CI** (test, lint, image build, Bandit) — not CD.
 
-## Highlights
+[![Main CI Pipeline](https://github.com/nabinkim0318/discord_rag_bot/actions/workflows/main.yml/badge.svg)](https://github.com/nabinkim0318/discord_rag_bot/actions/workflows/main.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-* **FastAPI backend** with REST endpoints for RAG queries, feedback, and service health
-* **Hybrid retrieval architecture** combining keyword and vector retrieval with fusion and reranking
-* **Weaviate vector database** for semantic retrieval
-* **SQLite by default with PostgreSQL-compatible configuration** through SQLModel / SQLAlchemy
-* **Docker Compose orchestration** for backend, frontend, vector store, monitoring, and Discord bot services
-* **Prometheus + Grafana observability** with application and RAG-specific metrics
-* Component-level **health checks** for the database, vector store, and application runtime
-* **Structured request and database logging** with request IDs and latency tracking
-* User **feedback collection and satisfaction metrics**
-* Automated backend and RAG-agent testing through **pytest**
-* **GitHub Actions CI/CD** for tests, formatting checks, Docker builds, and security-report generation
-* Optional **Discord bot** and **Next.js web interface**
+## What this is
 
----
+| It does | It does not |
+| --- | --- |
+| Hybrid BM25 + vector retrieval with explicit fusion | Treat leftover MMR parameters as a live stage |
+| Persist queries and thumbs-up/down feedback | Expose query or feedback history as a public list API |
+| Fail closed on RAG errors (no mock answers) | Provide multi-region HA or a status page |
+| Ship Prometheus + a provisioned Grafana dashboard | Enforce SLO targets as product guarantees |
+| Run a committed BM25 retrieval smoke eval in CI | Score generated-answer quality |
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    User[User] --> Web[Next.js Frontend]
-    User --> Discord[Discord Bot]
-
-    Web --> API[FastAPI Backend]
-    Discord --> API
-
-    API --> RAG[RAG Pipeline]
-    API --> DB[(SQL Database)]
-
-    RAG --> Retrieve[Hybrid Retrieval]
-    Retrieve --> Vector[(Weaviate)]
-    Retrieve --> Keyword[Keyword Search]
-    Retrieve --> Rerank[Reranking / Fusion]
-
-    RAG --> LLM[LLM Generation]
-
-    API --> Metrics[Prometheus Metrics]
-    Metrics --> Prometheus[Prometheus]
-    Prometheus --> Grafana[Grafana]
-
-    API --> Logs[Structured Logs]
+  User --> Web[Next.js UI]
+  User --> Discord[Discord bot]
+  Web --> API[FastAPI]
+  Discord --> API
+  API --> RAG[rag_agent]
+  API --> SQLite[(SQLite)]
+  RAG --> FTS[SQLite FTS BM25]
+  RAG --> WV[Weaviate]
+  RAG --> Fuse[Score fusion]
+  Fuse --> CE[Optional cross-encoder]
+  CE --> LLM[LLM]
+  API --> Prom[Prometheus]
+  Prom --> Grafana
 ```
 
-### Containerized services
+| Service | Role | Host bind (Compose) |
+| --- | --- | --- |
+| `api` | FastAPI + `rag_agent` | `127.0.0.1:8001` |
+| `weaviate` | Vector index | `127.0.0.1:8080` |
+| `frontend` | Next.js pages UI | `127.0.0.1:3000` |
+| `bot` | Discord bot (`discord` profile) | no published port |
+| `prometheus` | Scrapes API (+ Weaviate) | `127.0.0.1:9090` |
+| `grafana` | Provisioned RAG dashboard | `127.0.0.1:3001` |
 
-The local Docker environment orchestrates:
+SQLite is the default application database. PostgreSQL-compatible SQLModel/Alembic code exists; Compose does **not** start Postgres.
 
-| Service      | Purpose                                |
-| ------------ | -------------------------------------- |
-| `api`        | FastAPI application and REST API       |
-| `weaviate`   | Vector database for semantic retrieval |
-| `frontend`   | Next.js user interface                 |
-| `bot`        | Optional Discord interface             |
-| `prometheus` | Metrics collection                     |
-| `grafana`    | Monitoring dashboards                  |
+## Live retrieval path
 
-The API and Weaviate services include Docker health checks, and persistent volumes are used for Weaviate, Prometheus, and Grafana data.
+`generate_answer` is the runtime path used by `/api/query/`, `/api/v1/rag/`, and `/api/v1/enhanced-rag/`.
 
----
+1. **BM25** over SQLite FTS5
+2. **Vector search** in Weaviate (OpenAI embeddings when configured)
+3. **Fusion** — weighted score fusion first, Reciprocal Rank Fusion if that path fails
+4. **Optional cross-encoder rerank** when `sentence-transformers` is available
+5. **Optional Cohere/Jina rerank** after generation retrieval, only if a provider key is present (`/api/v1/rag/` and `/api/query/` request Cohere by default; `/api/v1/enhanced-rag/` does not)
+6. **Context packing** into a token budget
+7. **LLM generation** (Azure OpenAI if configured, otherwise OpenAI)
 
-## Backend
+**MMR is not on this path.** `mmr_lambda` / `MMR_LAMBDA` remain in signatures and `env.template`; they do not change live ranking. A legacy helper still contains MMR code and is unused by `generate_answer`.
 
-The backend is implemented with **FastAPI, SQLModel, and SQLAlchemy**.
+If BM25 or Weaviate fails, that side returns empty and the other side can still proceed. If generation or the provider fails, the API returns a generic 503 — it does not invent an answer.
 
-Core responsibilities include:
-
-* RAG query APIs
-* enhanced RAG workflows
-* feedback collection
-* query persistence
-* database session management
-* centralized error handling
-* structured request logging
-* Prometheus instrumentation
-* dependency health endpoints
-
-Example API groups:
-
-```text
-/api/v1/rag
-/api/v1/enhanced-rag
-/api/v1/feedback
-/api/query
-/api/v1/health
-/metrics
-```
-
-FastAPI automatically exposes interactive API documentation when the backend is running:
-
-```text
-http://localhost:8001/docs
-```
-
----
-
-## Data Layer
-
-The application uses SQLModel / SQLAlchemy with database behavior configured through `DATABASE_URL`.
-
-Default local configuration:
-
-```text
-SQLite
-```
-
-The same database layer can be configured for PostgreSQL:
-
-```bash
-DATABASE_URL=postgresql://user:password@host:5432/rag_db
-```
-
-Database sessions include:
-
-* connection pre-ping
-* connection recycling
-* transaction commit / rollback handling
-* structured database operation logging
-
-This project intentionally keeps the local Docker setup lightweight; PostgreSQL is supported through configuration but is not provisioned as a default Docker Compose service.
-
----
-
-## RAG Pipeline
-
-The RAG code is separated from the application layer into a dedicated `rag_agent` package.
-
-The retrieval system includes modules for:
-
-* document ingestion
-* indexing
-* keyword retrieval
-* vector retrieval
-* retrieval fusion
-* reranking
-* query processing
-* generation
-* evaluation
-
-```text
-rag_agent/
-├── ingestion/
-├── indexing/
-├── retrieval/
-├── query/
-├── generation/
-├── evaluation/
-└── core/
-```
-
-Retrieval behavior can be configured through environment variables such as:
-
-```bash
-DEFAULT_TOP_K=5
-MAX_TOP_K=20
-
-BM25_WEIGHT=0.4
-VECTOR_WEIGHT=0.6
-MMR_LAMBDA=0.65
-```
-
-The vector layer uses **Weaviate**, with configurable embedding and LLM providers.
-
----
-
-## Observability
-
-Observability is a first-class part of the project rather than an afterthought.
-
-### Prometheus metrics
-
-The FastAPI service exposes Prometheus-compatible metrics at:
-
-```text
-/metrics
-```
-
-The application records metrics including:
-
-* RAG request counts
-* RAG failures
-* RAG query latency
-* end-to-end pipeline latency
-* retrieval hit outcomes
-* requested retrieval depth (`top_k`)
-* feedback submissions
-* user satisfaction
-* health-check outcomes
-* database health latency
-* vector-store health latency
-* circuit-breaker state
-
-Examples:
-
-```text
-rag_requests_total
-rag_failures_total
-rag_pipeline_latency_seconds
-rag_retrieval_hits_total
-feedback_submissions_total
-feedback_satisfaction_rate
-health_check_db_total
-health_check_vector_store_total
-```
-
-### Grafana
-
-Grafana runs as part of the Docker Compose environment and uses Prometheus as its metrics source.
-
-Local services:
-
-```text
-Prometheus: http://localhost:9090
-Grafana:    http://localhost:3001
-```
-
-The repository includes Grafana provisioning and dashboard configuration under:
-
-```text
-ops/grafana/
-```
-
----
-
-## Health Checks
-
-The API exposes service-level health endpoints:
-
-```text
-GET /api/v1/health/
-GET /api/v1/health/check
-GET /api/v1/health/db
-GET /api/v1/health/llm
-GET /api/v1/health/vector-store
-```
-
-Implemented checks include:
-
-### Application
-
-Validates basic application runtime behavior, including writable filesystem access.
-
-### Database
-
-Executes a real database ping:
-
-```sql
-SELECT 1
-```
-
-and records latency and failure metrics.
-
-### Vector Store
-
-Checks the availability and health of the configured Weaviate service.
-
-### LLM
-
-The LLM health endpoint and metrics interface are implemented, but the external LLM API call is currently disabled in the health check to keep local and CI environments deterministic.
-
----
-
-## Logging & Error Handling
-
-Backend requests receive generated request IDs and structured logging context.
-
-Request logging captures information such as:
-
-* HTTP method
-* endpoint
-* response status
-* request duration
-* request ID
-* available user / channel context
-
-Database operations also record session lifecycle events such as:
-
-```text
-SESSION_START
-SESSION_COMMIT
-SESSION_ROLLBACK
-SESSION_CLOSE
-```
-
-The FastAPI application uses centralized exception handling so API failures can be processed consistently.
-
----
-
-## Feedback Loop
-
-The platform includes feedback APIs and metrics rather than treating generation as a one-way interaction.
-
-Feedback infrastructure supports:
-
-* user feedback submission
-* feedback persistence
-* positive / negative response tracking
-* feedback history and summaries
-* user satisfaction metrics
-
-This allows retrieval and generation behavior to be evaluated with signals from actual usage.
-
----
-
-## CI/CD and Code Quality
-
-GitHub Actions runs automated checks for the backend, RAG agent, frontend, and Docker images.
-
-The workflow includes:
-
-### Backend
-
-* Python 3.11 setup
-* Poetry dependency installation
-* isort
-* Ruff linting / formatting checks
-* pytest
-
-### RAG Agent
-
-* Poetry dependency installation
-* linting / formatting checks
-* pytest
-
-### Frontend
-
-* Node.js setup
-* dependency installation
-* Prettier checks
-* frontend test command
-
-### Containers
-
-CI builds Docker images for:
-
-* backend
-* RAG agent
-* frontend
-* Discord bot
-
-Docker Buildx caching is enabled to improve build efficiency.
-
-### Security
-
-The pipeline also generates a **Bandit static-analysis report** for the Python backend and uploads it as a CI artifact.
-
-The security scan is currently informational rather than a blocking CI gate.
-
----
-
-## Quick Start
-
-### Requirements
-
-* Docker
-* Docker Compose
-* Git
-* OpenAI API key or compatible configured provider
-
-Clone the repository:
-
-```bash
-git clone https://github.com/nabinkim0318/discord_rag_bot.git
-cd discord_rag_bot
-```
-
-Create the environment file:
-
-```bash
-cp env.template .env
-```
-
-At minimum, configure:
-
-```bash
-OPENAI_API_KEY=your_key
-SECRET_KEY=your_secret_key
-```
-
-Optional Discord integration also requires:
-
-```bash
-DISCORD_BOT_TOKEN=your_discord_bot_token
-```
-
-Validate the environment:
-
-```bash
-make env-check
-```
-
----
-
-## Run with Docker
-
-Build the containers:
-
-```bash
-make docker-build
-```
-
-Start the core services:
-
-```bash
-make docker-up
-```
-
-This starts the API, frontend, Weaviate, Prometheus, and Grafana services.
-
-To also start the Discord bot:
-
-```bash
-make docker-up-with-bot
-```
-
-View logs:
-
-```bash
-make docker-logs
-```
-
-Backend-only logs:
-
-```bash
-make docker-logs-api
-```
-
-Stop the environment:
-
-```bash
-make docker-down
-```
-
----
-
-## Local Development
-
-Install project dependencies:
-
-```bash
-make install
-```
-
-Run the backend:
-
-```bash
-make run-backend
-```
-
-Run the frontend:
-
-```bash
-make run-frontend
-```
-
-Run the RAG agent from the CLI:
-
-```bash
-make run-rag
-```
-
----
-
-## Testing
-
-Run the complete project test commands:
-
-```bash
-make test
-```
-
-Or run components individually:
-
-```bash
-make test-backend
-make test-rag
-make test-frontend
-```
-
-Backend and RAG tests use `pytest`.
-
-The frontend test workflow uses Jest.
-
----
-
-## Code Quality
-
-Run lint checks:
-
-```bash
-make lint
-```
-
-Run formatting:
-
-```bash
-make format
-```
-
-Verify formatting without modifying files:
-
-```bash
-make format-check
-```
-
-Run pre-commit checks:
-
-```bash
-make precommit
-```
-
----
-
-## RAG Evaluation
-
-This evaluator scores **retrieval ranking** (ranked chunk UIDs vs gold `relevant_uids`).
-It does not measure generated-answer quality or prompt versions.
-
-The public reproducibility path is an offline SQLite/FTS smoke evaluation
-over the committed demo corpus. It does not need Weaviate or an LLM provider:
+## Evaluation (retrieval only)
 
 ```bash
 make eval-rag-demo
 ```
 
-That command is a reproducibility/smoke fixture, not a retrieval benchmark.
+Indexes **6** committed synthetic documents, checks **8** gold cases, and scores BM25 ranking (nDCG, hit rate, and related ranking metrics). No Weaviate, LLM, Docker, or private data.
 
-Optional hybrid evaluation (SQLite + Weaviate/vector) requires configured
-services and data:
+CI runs this as a **reproducibility smoke test**, not as a published retrieval benchmark and not as generation-quality evaluation.
+
+Optional hybrid eval (Weaviate + embeddings required, not in CI):
 
 ```bash
 make eval-rag-hybrid EVAL_GOLD=... EVAL_SQLITE=...
 ```
 
----
+Details: [`rag_agent/evaluation/README.md`](rag_agent/evaluation/README.md)
 
-## Project Structure
+## API, health, feedback
 
-```text
-discord_rag_bot/
-├── backend/
-│   ├── app/
-│   │   ├── api/             # FastAPI routes
-│   │   ├── core/            # config, logging, metrics, errors
-│   │   ├── db/              # database sessions
-│   │   ├── models/          # SQLModel data models
-│   │   └── services/        # application services
-│   └── tests/
-│
-├── rag_agent/
-│   ├── ingestion/           # document ingestion
-│   ├── indexing/            # indexing workflows
-│   ├── retrieval/           # keyword/vector retrieval & reranking
-│   ├── generation/          # generation pipeline
-│   ├── evaluation/          # RAG evaluation
-│   └── tests/
-│
-├── frontend/                # Next.js frontend
-├── bots/                    # Discord bot
-│
-├── ops/
-│   ├── prometheus/
-│   └── grafana/
-│
-├── scripts/
-├── docs/
-├── docker-compose.yaml
-├── env.template
-├── Makefile
-└── .github/workflows/
+| Method | Path | Notes |
+| --- | --- | --- |
+| POST | `/api/query/` | RAG + persist query row; returns `query_id` |
+| POST | `/api/v1/rag/` | RAG, no DB persist |
+| POST | `/api/v1/enhanced-rag/` | Same `generate_answer` core; no Cohere rerank request |
+| POST | `/api/v1/feedback/submit` | `up` / `down`; `user_id` is metadata, not auth |
+| GET | `/api/v1/feedback/stats/{query_id}` | Aggregate counts only |
+| GET | `/api/v1/feedback/summary` | Aggregate windowed summary |
+| GET | `/api/v1/health/` | Process liveness |
+| GET | `/api/v1/health/livez` | Process liveness (Compose healthcheck) |
+| GET | `/api/v1/health/readyz` | SQLite + Weaviate; **503** if either fails |
+| GET | `/api/v1/health/db` | `SELECT 1`; **503** on failure |
+| GET | `/api/v1/health/vector-store` | Weaviate; **503** on failure |
+| GET | `/api/v1/health/check` | Log-dir write probe; **503** on failure |
+| GET | `/api/v1/health/llm` | Config status; live probe only if `HEALTH_LLM_PROBE_ENABLED=true` |
+| GET | `/api/v1/enhanced-rag/health` | Same readiness as `/readyz`; **no RAG query** |
+| GET | `/metrics` | Prometheus scrape |
+
+Queries are bounded (`MAX_QUERY_LENGTH`, default **4000**; `top_k` 1–20). There is no public streaming flag and no public query-list or per-user feedback-history route.
+
+Web thumbs send `{ query_id, score }` with no `user_id`; the API stores them under `"web"`. Discord sends the Discord user id for duplicate detection only.
+
+## Observability and privacy
+
+API request logs record **method, path, status, duration, request id**. They do not record prompt text, answers, or user/channel identifiers.
+
+Grafana dashboard **RAG Bot Core Metrics Dashboard** (folder `RAG Bot`) is provisioned from `ops/grafana/`. Default Prometheus jobs: `prometheus`, `fastapi-backend` (`api:8001/metrics`), `weaviate`. Discord bot scrape is **opt-in** via the Discord Compose overlay. Panel queries and metric names: [`docs/observability.md`](docs/observability.md).
+
+Provisioned example alerts (not SLOs): p95 pipeline latency and retrieval hit rate.
+
+## CI
+
+Workflow: [`.github/workflows/main.yml`](.github/workflows/main.yml) (`Main CI Pipeline`).
+
+| Job name | What it gates |
+| --- | --- |
+| Backend (FastAPI) | isort, Ruff, pytest |
+| RAG Agent Pipeline | isort, Ruff, pytest, `make eval-rag-demo` |
+| Frontend (React/Next.js) | Prettier, ESLint, Jest |
+| Docker Build | backend / rag_agent / frontend / bot images, **push: false** |
+| Backend Security Scan (Bandit high/high) | `bandit -r app` — **high/high blocking**; full JSON is informational |
+| Integration Check | Aggregate job after the five above |
+
+Bandit is scoped to **`backend/app`**, not `rag_agent` or `bots`. A passing Bandit gate is not a general security audit.
+
+`main` is protected by the repository ruleset **Protect main**, which requires the five named checks above (not `Integration Check`).
+
+## Quick start
+
+```bash
+git clone https://github.com/nabinkim0318/discord_rag_bot.git
+cd discord_rag_bot
+cp env.template .env
 ```
 
----
+Set at least `OPENAI_API_KEY` and `SECRET_KEY`. Grafana requires `GRAFANA_ADMIN_PASSWORD` (no committed default). Discord needs `DISCORD_BOT_TOKEN`.
 
-## Engineering Focus
+```bash
+make env-check
+make docker-up              # api, frontend, weaviate, prometheus, grafana
+make docker-up-with-bot     # also bot + Discord Prometheus scrape overlay
+```
 
-This project was built to explore the engineering work required around an AI system—not only model invocation.
+| URL | Service |
+| --- | --- |
+| http://127.0.0.1:3000 | Frontend |
+| http://127.0.0.1:8001/docs | API docs |
+| http://127.0.0.1:9090 | Prometheus |
+| http://127.0.0.1:3001 | Grafana (user `admin` unless `GRAFANA_ADMIN_USER` is set) |
 
-Areas of focus include:
+Weaviate anonymous access is off. Compose and the API share `WEAVIATE_API_KEY` (template default `local-dev-weaviate-api-key`). That is local-dev only.
 
-* separating application and RAG concerns
-* exposing reusable APIs
-* containerizing multiple dependent services
-* designing observable application behavior
-* monitoring retrieval and generation performance
-* implementing dependency-specific health checks
-* persisting queries and feedback
-* building reproducible evaluation workflows
-* incorporating automated tests and CI
-* documenting operational and troubleshooting workflows
+Without Docker: `make install` then `make run-backend` / `make run-frontend`.
 
----
+## Development
 
-## Current Limitations
+```bash
+make test          # backend + rag_agent + frontend
+make lint
+make format-check
+make eval-rag-demo
+```
 
-This repository is a development and engineering portfolio project rather than a fully managed production deployment.
+Python **3.11** and Node **20** match CI. Dependencies: Poetry (`backend/`, `rag_agent/`), npm (`frontend/`). Discord bot extra deps: `bots/discord/requirements.txt`.
 
-Notable limitations include:
+## Repository layout
 
-* the default Docker environment uses SQLite rather than provisioning PostgreSQL
-* local Docker configuration contains development-oriented defaults that should be replaced before production deployment
-* the LLM health endpoint does not currently perform an external provider request
-* CI security scanning generates reports but does not currently block merges
-* production secrets, TLS termination, managed database infrastructure, and cloud orchestration are outside the current repository scope
+```text
+backend/          FastAPI, Alembic, tests
+rag_agent/        ingestion, retrieval, generation, demo eval
+frontend/         Next.js (pages router)
+bots/discord/     interactions.py bot
+ops/prometheus/   scrape config
+ops/grafana/      datasource, dashboard, example alerts
+docs/             guides (index: docs/README.md)
+docker-compose.yaml
+docker-compose.discord.yaml
+env.template
+```
 
-These boundaries are documented intentionally so implemented behavior is distinguishable from planned production infrastructure.
+## Limitations
 
----
+- Compose binds to **loopback**. No TLS, ingress, or cloud deploy in-repo.
+- Schema lifecycle is **Alembic**; SQLite is the default DB. Postgres is not provisioned here.
+- Discord feedback button state is **process-local** (TTL/size-bounded). Restarts expire buttons.
+- Anonymous web feedback shares identity `"web"`.
+- `HEALTH_LLM_PROBE_ENABLED` defaults **false** so CI/local health does not call a paid API.
+- Demo eval scores are **not** a retrieval or generation benchmark.
+- `MMR_LAMBDA` in `env.template` does not affect the live `generate_answer` path.
 
 ## Documentation
 
-Additional technical documentation is available under:
-
-```text
-docs/
-```
-
-including guides for:
-
-* Docker setup
-* observability
-* RAG architecture
-* testing
-* contribution workflows
-
----
+- [Documentation index](docs/README.md)
+- [Docker / local Compose](docs/DOCKER.md)
+- [RAG pipeline](docs/RAG_SYSTEM_GUIDE.md)
+- [Retrieval evaluation](rag_agent/evaluation/README.md)
+- [Discord bot](docs/DISCORD_BOT_GUIDE.md)
+- [Observability](docs/observability.md)
+- [Testing](docs/TEST_STRUCTURE.md)
+- [Contributing](docs/CONTRIBUTING.md)
 
 ## License
 
-MIT License.
+[MIT](LICENSE) © 2025 Nabin Kim
