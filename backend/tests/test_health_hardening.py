@@ -338,3 +338,78 @@ def test_docker_liveness_url_exists_and_returns_intended_status():
         response = client.get("/api/v1/health/livez")
     assert response.status_code == 200
     assert response.json()["mode"] == "liveness"
+
+
+def test_enhanced_rag_health_matches_readyz_without_double_counting_metrics():
+    before_db_success = _counter_value(health_check_db_counter, status="success")
+    before_vector_success = _counter_value(
+        health_check_vector_store_counter, status="success"
+    )
+    before_db_failure = _counter_value(health_check_db_counter, status="failure")
+
+    _, override = _override_db_session()
+    app.dependency_overrides[get_session] = override
+    try:
+        with (
+            patch("app.api.v1.health.get_weaviate_client") as mock_get_client,
+            patch("app.api.v1.enhanced_rag.run_enhanced_rag_pipeline") as mock_pipeline,
+            TestClient(app) as client,
+        ):
+            mock_client = MagicMock()
+            mock_client.health_check.return_value = True
+            mock_get_client.return_value = mock_client
+            ok = client.get("/api/v1/enhanced-rag/health")
+    finally:
+        app.dependency_overrides.pop(get_session, None)
+
+    assert ok.status_code == 200
+    assert ok.json()["status"] == "ready"
+    assert ok.json()["service"] == "enhanced-rag"
+    mock_pipeline.assert_not_called()
+    assert (
+        _counter_value(health_check_db_counter, status="success") == before_db_success
+    )
+    assert (
+        _counter_value(health_check_vector_store_counter, status="success")
+        == before_vector_success
+    )
+
+    _, unhealthy = _override_db_session(Exception(SENTINEL_DB))
+    app.dependency_overrides[get_session] = unhealthy
+    try:
+        with (
+            patch("app.api.v1.health.get_weaviate_client") as mock_get_client,
+            TestClient(app) as client,
+        ):
+            mock_client = MagicMock()
+            mock_client.health_check.return_value = True
+            mock_get_client.return_value = mock_client
+            failed = client.get("/api/v1/enhanced-rag/health")
+    finally:
+        app.dependency_overrides.pop(get_session, None)
+
+    assert failed.status_code == 503
+    assert failed.json()["status"] == "not_ready"
+    assert SENTINEL_DB not in failed.text
+    assert (
+        _counter_value(health_check_db_counter, status="failure") == before_db_failure
+    )
+
+
+def test_enhanced_rag_health_returns_503_when_vector_store_unavailable():
+    _, override = _override_db_session()
+    app.dependency_overrides[get_session] = override
+    try:
+        with (
+            patch("app.api.v1.health.get_weaviate_client") as mock_get_client,
+            TestClient(app) as client,
+        ):
+            mock_get_client.side_effect = RuntimeError(SENTINEL_VECTOR)
+            response = client.get("/api/v1/enhanced-rag/health")
+    finally:
+        app.dependency_overrides.pop(get_session, None)
+
+    assert response.status_code == 503
+    assert response.json()["status"] == "not_ready"
+    assert response.json()["dependencies"]["vector_store"] == "unhealthy"
+    assert SENTINEL_VECTOR not in response.text

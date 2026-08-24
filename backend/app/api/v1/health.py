@@ -137,6 +137,35 @@ def _record_vector_store(ok: bool, duration: float) -> None:
     health_check_vector_store_latency.observe(duration)
 
 
+def assess_readiness(session: Session) -> dict[str, Any]:
+    """Canonical readiness for a meaningful RAG request.
+
+    Does not record metrics. Callers that own a public probe (/readyz)
+    record once; compatibility wrappers must not record again.
+    """
+    db_ok, db_duration = _check_db(session)
+    vector_ok, vector_duration = _check_vector_store()
+    ready = db_ok and vector_ok
+    return {
+        "ready": ready,
+        "db_ok": db_ok,
+        "db_duration": db_duration,
+        "vector_ok": vector_ok,
+        "vector_duration": vector_duration,
+        "payload": {
+            "status": "ready" if ready else "not_ready",
+            "dependencies": {
+                "database": "healthy" if db_ok else "unhealthy",
+                "vector_store": "healthy" if vector_ok else "unhealthy",
+            },
+            "duration": {
+                "database": db_duration,
+                "vector_store": vector_duration,
+            },
+        },
+    }
+
+
 @health_router.get("/")
 def health():
     """Process liveness. No external dependency probes. Discord /health uses this."""
@@ -152,24 +181,10 @@ def livez():
 @health_router.get("/readyz", tags=["Health"])
 async def readyz(session: Session = Depends(get_session)):
     """Readiness for a meaningful RAG request: database and vector store."""
-    db_ok, db_duration = _check_db(session)
-    _record_db(db_ok, db_duration)
-    vector_ok, vector_duration = _check_vector_store()
-    _record_vector_store(vector_ok, vector_duration)
-
-    ready = db_ok and vector_ok
-    payload = {
-        "status": "ready" if ready else "not_ready",
-        "dependencies": {
-            "database": "healthy" if db_ok else "unhealthy",
-            "vector_store": "healthy" if vector_ok else "unhealthy",
-        },
-        "duration": {
-            "database": db_duration,
-            "vector_store": vector_duration,
-        },
-    }
-    return _json(payload, 200 if ready else 503)
+    result = assess_readiness(session)
+    _record_db(result["db_ok"], result["db_duration"])
+    _record_vector_store(result["vector_ok"], result["vector_duration"])
+    return _json(result["payload"], 200 if result["ready"] else 503)
 
 
 @health_router.get("/check", tags=["Health"])
