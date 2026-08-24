@@ -2,8 +2,18 @@
 Pytest configuration for backend tests.
 """
 
+import os
 import sys
+import tempfile
 from pathlib import Path
+
+# Isolate the default application engine from the developer workspace DB
+# unless a live PostgreSQL URL is explicitly provided.
+_existing_url = os.environ.get("DATABASE_URL", "")
+if not _existing_url.startswith("postgresql"):
+    _test_db = Path(tempfile.gettempdir()) / "discord_rag_bot_pytest.sqlite3"
+    _test_db.unlink(missing_ok=True)
+    os.environ["DATABASE_URL"] = f"sqlite:///{_test_db}"
 
 # Add backend directory to Python path for imports
 backend_dir = Path(__file__).parent

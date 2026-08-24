@@ -4,7 +4,8 @@ import time
 from contextlib import contextmanager
 from typing import Generator
 
-from sqlalchemy.engine import make_url
+from sqlalchemy import event
+from sqlalchemy.engine import Engine, make_url
 from sqlmodel import Session, create_engine
 
 from app.core.logging import log_database_operation, logger
@@ -23,6 +24,22 @@ engine = create_engine(
     pool_recycle=300,  # Recreate connection every 5 minutes
     connect_args=connect_args,
 )
+
+
+def _enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
+    """Honor declared foreign keys on SQLite connections."""
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
+
+if url.get_backend_name() == "sqlite":
+    event.listen(engine, "connect", _enable_sqlite_foreign_keys)
+
+
+def configure_sqlite_engine(sqlite_engine: Engine) -> None:
+    """Enable SQLite foreign keys on an isolated test/engine instance."""
+    event.listen(sqlite_engine, "connect", _enable_sqlite_foreign_keys)
 
 
 def get_session() -> Generator[Session, None, None]:
