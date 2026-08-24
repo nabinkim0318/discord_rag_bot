@@ -519,21 +519,24 @@ make precommit
 
 ## RAG Evaluation
 
-The repository includes a separate evaluation workflow for comparing retrieval / generation configurations and prompt versions.
+This evaluator scores **retrieval ranking** (ranked chunk UIDs vs gold `relevant_uids`).
+It does not measure generated-answer quality or prompt versions.
 
-Example:
-
-```bash
-make eval-rag
-```
-
-Multiple prompt versions can be evaluated with:
+The public reproducibility path is an offline SQLite/FTS smoke evaluation
+over the committed demo corpus. It does not need Weaviate or an LLM provider:
 
 ```bash
-make eval-rag-all
+make eval-rag-demo
 ```
 
-This separation keeps application behavior and RAG evaluation reproducible rather than embedding experimentation directly into API code.
+That command is a reproducibility/smoke fixture, not a retrieval benchmark.
+
+Optional hybrid evaluation (SQLite + Weaviate/vector) requires configured
+services and data:
+
+```bash
+make eval-rag-hybrid EVAL_GOLD=... EVAL_SQLITE=...
+```
 
 ---
 

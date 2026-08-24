@@ -4,14 +4,15 @@ from __future__ import annotations
 import random
 from typing import Any, Dict, List, Tuple
 
-from rag_agent.indexing.embeddings import embed_texts
-from rag_agent.indexing.sqlite_fts import fts_count, get_by_chunk_uid, init_sqlite
-from rag_agent.indexing.sqlite_fts import table_count
-from rag_agent.indexing.sqlite_fts import table_count as sqlite_table_count
-from rag_agent.indexing.sqlite_fts import upsert_chunks
-from rag_agent.indexing.weaviate_index import ensure_schema, fetch_by_chunk_uid
-from rag_agent.indexing.weaviate_index import get_count as weaviate_count
-from rag_agent.indexing.weaviate_index import upsert_chunks_with_vectors
+from rag_agent.indexing.sqlite_fts import (
+    fts_count,
+    get_by_chunk_uid,
+    init_sqlite,
+    table_count,
+    upsert_chunks,
+)
+
+sqlite_table_count = table_count
 
 
 def _rows_from_chunks(
@@ -86,27 +87,28 @@ def hybrid_index(
 ) -> Dict[str, Any]:
     """
     1) SQLite+FTS5 (BM25) upsert
-    2) embeddings calculation
-    3) Weaviate upsert
-    4) Synchronization verification (row count match
-    & random sample chunk_uid cross-check in separate lookup function)
+    2) embeddings + Weaviate upsert only when Weaviate is enabled
+    3) Synchronization verification lives in verify_sync()
     """
     # 0) Initialize (only once)
     init_sqlite(sqlite_path)
     if weaviate_enabled:
+        from rag_agent.indexing.weaviate_index import ensure_schema
+
         ensure_schema()
 
     # 1) SQLite Indexing
     rows = _rows_from_chunks(chunks)
     n_sql = upsert_chunks(sqlite_path, rows)
 
-    # 2) Embedding
-    texts = [ch["text"] for ch in chunks]
-    vectors = embed_texts(texts, model=embed_model)
-
-    # 3) Weaviate Indexing
+    # 2-3) Embeddings and Weaviate are skipped for sqlite-only indexes.
     n_vec = 0
     if weaviate_enabled:
+        from rag_agent.indexing.embeddings import embed_texts
+        from rag_agent.indexing.weaviate_index import upsert_chunks_with_vectors
+
+        texts = [ch["text"] for ch in chunks]
+        vectors = embed_texts(texts, model=embed_model)
         items = _weaviate_items(chunks, vectors)
         n_vec = upsert_chunks_with_vectors(items)
 
@@ -140,6 +142,9 @@ def verify_sync(
     - compare total counts (optional)
     - check if same chunk_uid exists in SQLite/Weaviate
     """
+    from rag_agent.indexing.weaviate_index import fetch_by_chunk_uid
+    from rag_agent.indexing.weaviate_index import get_count as weaviate_count
+
     res: Dict[str, Any] = {"count_sqlite": None, "count_weaviate": None, "mismatch": []}
     ok = True
     try:

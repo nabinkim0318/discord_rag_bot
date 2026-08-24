@@ -40,6 +40,10 @@ htmlcov/
 *.sqlite3
 *.db
 
+# Generated retrieval evaluation artifacts (not source)
+rag_agent/evaluation_results/
+rag_agent/.demo/
+
 
 # ========================
 # Python (backend, rag_agent)
