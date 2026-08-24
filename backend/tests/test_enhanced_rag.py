@@ -1,9 +1,10 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.core.exceptions import ExternalServiceException, RAGException
+from app.db.session import get_session
 from app.main import app
 
 
@@ -98,3 +99,64 @@ def test_enhanced_query_rag_pipeline_failure_returns_sanitized_503(client):
     mock_failure_metric.assert_called_once_with(
         "/api/v1/enhanced-rag/", "RAG_RETRIEVAL_ERROR"
     )
+
+
+def _override_db_session(exec_side_effect=None):
+    session = MagicMock()
+    if exec_side_effect is not None:
+        session.exec.side_effect = exec_side_effect
+    else:
+        session.exec.return_value = MagicMock()
+
+    def _override():
+        yield session
+
+    return _override
+
+
+def test_enhanced_rag_health_does_not_run_pipeline_or_llm(client):
+    app.dependency_overrides[get_session] = _override_db_session()
+    try:
+        with (
+            patch("app.api.v1.health.get_weaviate_client") as mock_get_client,
+            patch("app.api.v1.enhanced_rag.run_enhanced_rag_pipeline") as mock_pipeline,
+            patch("app.api.v1.health.perform_llm_probe") as mock_probe,
+        ):
+            mock_client = MagicMock()
+            mock_client.health_check.return_value = True
+            mock_get_client.return_value = mock_client
+            response = client.get("/api/v1/enhanced-rag/health")
+    finally:
+        app.dependency_overrides.pop(get_session, None)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ready"
+    assert payload["service"] == "enhanced-rag"
+    assert payload["mode"] == "readiness"
+    mock_pipeline.assert_not_called()
+    mock_probe.assert_not_called()
+
+
+def test_enhanced_rag_health_returns_503_when_not_ready(client):
+    sentinel = "SENTINEL_ENHANCED_RAG_HEALTH_DB"
+    app.dependency_overrides[get_session] = _override_db_session(Exception(sentinel))
+    try:
+        with (
+            patch("app.api.v1.health.get_weaviate_client") as mock_get_client,
+            patch("app.api.v1.enhanced_rag.run_enhanced_rag_pipeline") as mock_pipeline,
+        ):
+            mock_client = MagicMock()
+            mock_client.health_check.return_value = True
+            mock_get_client.return_value = mock_client
+            response = client.get("/api/v1/enhanced-rag/health")
+    finally:
+        app.dependency_overrides.pop(get_session, None)
+
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["status"] == "not_ready"
+    assert payload["dependencies"]["database"] == "unhealthy"
+    assert sentinel not in response.text
+    assert "error" not in payload
+    mock_pipeline.assert_not_called()

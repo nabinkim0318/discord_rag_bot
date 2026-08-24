@@ -1,18 +1,28 @@
 version: "3.9"
 
+# Local/portfolio development topology only.
+# Host-published ports bind to loopback. Internal service-to-service
+# traffic continues to use Docker DNS names on app_net / monitoring.
+# This file is not a production deployment.
+
 services:
   # ==================== Vector Database ====================
   weaviate:
     image: semitechnologies/weaviate:1.24.10
     container_name: weaviate
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     env_file:
       - ./.env
     environment:
       CLUSTER_HOSTNAME: weaviate-1
       QUERY_DEFAULTS_LIMIT: "${WEAVIATE_QUERY_LIMIT:-25}"
-      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "${WEAVIATE_ANONYMOUS_ACCESS_ENABLED:-true}"
+      # Local-dev only: anonymous access is disabled. Backend and Weaviate
+      # must share WEAVIATE_API_KEY. Do not treat this as production-safe.
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "${WEAVIATE_ANONYMOUS_ACCESS_ENABLED:-false}"
+      AUTHENTICATION_APIKEY_ENABLED: "true"
+      AUTHENTICATION_APIKEY_ALLOWED_KEYS: "${WEAVIATE_API_KEY:-local-dev-weaviate-api-key}"
+      AUTHENTICATION_APIKEY_USERS: "${WEAVIATE_APIKEY_USER:-local-dev}"
       PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
       DEFAULT_VECTORIZER_MODULE: "text2vec-openai"
       ENABLE_MODULES: "text2vec-openai"
@@ -27,7 +37,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -q -O - http://localhost:8080/v1/meta >/dev/null 2>&1 || exit 1",
+          "wget -q -O - http://localhost:8080/v1/.well-known/ready >/dev/null 2>&1 || exit 1",
         ]
       interval: 30s
       timeout: 10s
@@ -43,11 +53,13 @@ services:
       - ./.env
     environment:
       SERVICE_CONTEXT: backend
+      WEAVIATE_URL: "${WEAVIATE_URL:-http://weaviate:8080}"
+      WEAVIATE_API_KEY: "${WEAVIATE_API_KEY:-local-dev-weaviate-api-key}"
     volumes:
       - ./backend:/app
       - ./rag_agent:/app/rag_agent
     ports:
-      - "8001:8001"
+      - "127.0.0.1:8001:8001"
     command: uvicorn app.main:app --host 0.0.0.0 --port 8001
     depends_on:
       weaviate:
@@ -58,25 +70,12 @@ services:
     restart: unless-stopped
     healthcheck:
       test:
-        - CMD-SHELL
-        - |
-          python - <<'PY'
-          import socket
-          import sys
-          import time
-
-          ok = 0
-          for _ in range(10):
-              try:
-                  s = socket.create_connection(("127.0.0.1", 8001), timeout=2)
-                  s.close()
-                  ok = 1
-                  break
-              except Exception:
-                  time.sleep(3)
-
-          sys.exit(0 if ok else 1)
-          PY
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://127.0.0.1:8001/api/v1/health/livez",
+        ]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -102,7 +101,7 @@ services:
       ASSET_REGEN_PATH: "${ASSET_REGEN_PATH:-assets/refresh-page-option.png}"
     depends_on:
       api:
-        condition: service_started
+        condition: service_healthy
     networks:
       - app_net
     restart: unless-stopped
@@ -116,14 +115,14 @@ services:
       dockerfile: Dockerfile
     container_name: discord-rag-frontend
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       NEXT_PUBLIC_BACKEND_API_URL: "${NEXT_PUBLIC_BACKEND_API_URL:-http://localhost:8001/api/v1}"
       BACKEND_URL: "${BACKEND_URL:-http://api:8001}"
       NODE_ENV: "${NODE_ENV:-production}"
     depends_on:
       api:
-        condition: service_started
+        condition: service_healthy
     networks:
       - app_net
     restart: unless-stopped
@@ -133,7 +132,7 @@ services:
     image: prom/prometheus:latest
     container_name: prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -153,7 +152,7 @@ services:
     image: grafana/grafana:latest
     container_name: grafana
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     env_file:
       - ./.env
     environment:

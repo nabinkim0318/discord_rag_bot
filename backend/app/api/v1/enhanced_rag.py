@@ -6,10 +6,14 @@ Enhanced RAG API endpoints
 - Discord-optimized responses
 """
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
+from sqlmodel import Session
 
+from app.api.v1.health import assess_readiness
 from app.core.exceptions import ExternalServiceException, RAGException
 from app.core.metrics import record_failure_metric
+from app.db.session import get_session
 from app.models.rag import RAGQueryRequest, RAGQueryResponse
 from app.services.enhanced_rag_service import run_enhanced_rag_pipeline
 
@@ -73,25 +77,16 @@ async def enhanced_query_rag(request: RAGQueryRequest, http_request: Request):
 
 
 @enhanced_rag_router.get("/health")
-async def enhanced_rag_health():
-    """Enhanced RAG service health check"""
-    try:
-        # Check service status with simple test query
-        test_query = "test query"
-        answer, contexts, metadata = run_enhanced_rag_pipeline(
-            query=test_query, top_k=1
-        )
+async def enhanced_rag_health(session: Session = Depends(get_session)):
+    """Compatibility readiness wrapper. Uses the canonical /readyz assessment.
 
-        return {
-            "status": "healthy",
-            "service": "enhanced-rag",
-            "test_query_processed": True,
-            "metadata": {
-                "total_time": metadata.get("total_time", 0),
-                "retrieval_time": metadata.get("retrieval_time", 0),
-                "generation_time": metadata.get("generation_time", 0),
-            },
-        }
-
-    except Exception as e:
-        return {"status": "unhealthy", "service": "enhanced-rag", "error": str(e)}
+    Does not run a RAG query or contact an LLM. Metrics are owned by /readyz.
+    """
+    result = assess_readiness(session)
+    payload = {
+        "status": result["payload"]["status"],
+        "service": "enhanced-rag",
+        "mode": "readiness",
+        "dependencies": result["payload"]["dependencies"],
+    }
+    return JSONResponse(content=payload, status_code=200 if result["ready"] else 503)

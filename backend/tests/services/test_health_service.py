@@ -2,12 +2,16 @@
 Tests for Health service functionality
 """
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.api.v1.health import (
+    PUBLIC_DB_UNAVAILABLE,
+    PUBLIC_FILESYSTEM_UNAVAILABLE,
+    PUBLIC_VECTOR_UNAVAILABLE,
     health,
     health_check,
     health_check_db,
@@ -15,6 +19,12 @@ from app.api.v1.health import (
     health_check_vector_store,
 )
 from app.main import app
+
+
+def _body(response):
+    if isinstance(response, dict):
+        return response
+    return json.loads(response.body)
 
 
 class TestHealthService:
@@ -30,92 +40,106 @@ class TestHealthService:
     @pytest.mark.asyncio
     async def test_health_check_success(self, mock_get_log_dir):
         """Test health check endpoint success"""
-        # Mock log directory
         mock_log_dir = MagicMock()
         mock_log_dir.mkdir.return_value = None
-        mock_log_dir.__truediv__.return_value = mock_log_dir  # For path operations
+        mock_log_dir.__truediv__.return_value = mock_log_dir
         mock_log_dir.write_text.return_value = None
         mock_log_dir.unlink.return_value = None
         mock_get_log_dir.return_value = mock_log_dir
 
         result = await health_check()
+        payload = _body(result)
 
-        assert result["status"] == "healthy"
-        assert "duration" in result
-        assert "checks" in result
-        assert "filesystem" in result["checks"]
+        assert result.status_code == 200
+        assert payload["status"] == "healthy"
+        assert "duration" in payload
+        assert "checks" in payload
+        assert "filesystem" in payload["checks"]
 
     @patch("app.core.config.get_log_dir")
     @pytest.mark.asyncio
     async def test_health_check_failure(self, mock_get_log_dir):
         """Test health check endpoint failure"""
-        # Mock log directory failure
         mock_get_log_dir.side_effect = Exception("Directory access failed")
 
         result = await health_check()
+        payload = _body(result)
 
-        assert result["status"] == "unhealthy"
-        assert "error" in result
-        assert "duration" in result
-        assert "Directory access failed" in result["error"]
+        assert result.status_code == 503
+        assert payload["status"] == "unhealthy"
+        assert payload["error"] == PUBLIC_FILESYSTEM_UNAVAILABLE
+        assert "Directory access failed" not in json.dumps(payload)
+        assert "duration" in payload
 
     @pytest.mark.asyncio
     async def test_health_check_db_success(self):
         """Test database health check success"""
-        # Mock database session
         mock_session = MagicMock()
         mock_session.execute.return_value.fetchone.return_value = (1,)
 
         result = await health_check_db(mock_session)
+        payload = _body(result)
 
-        assert result["status"] == "database healthy"
-        assert "duration" in result
+        assert result.status_code == 200
+        assert payload["status"] == "database healthy"
+        assert "duration" in payload
 
     @pytest.mark.asyncio
     async def test_health_check_db_failure(self):
         """Test database health check failure"""
-        # Mock database session with error
         mock_session = MagicMock()
         mock_session.exec.side_effect = Exception("Database connection failed")
 
         result = await health_check_db(mock_session)
+        payload = _body(result)
 
-        assert result["status"] == "database unhealthy"
-        assert "error" in result
-        assert "duration" in result
-        assert "Database connection failed" in result["error"]
+        assert result.status_code == 503
+        assert payload["status"] == "database unhealthy"
+        assert payload["error"] == PUBLIC_DB_UNAVAILABLE
+        assert "Database connection failed" not in json.dumps(payload)
+        assert "duration" in payload
 
     @pytest.mark.asyncio
     async def test_health_check_llm_success(self):
-        """Test LLM health check success"""
+        """Test LLM health reports configuration without implying a live probe."""
         with (
             patch("app.api.v1.health.settings") as mock_settings,
             patch("app.api.v1.health.perf_counter", side_effect=[0, 0.1]),
         ):
             mock_settings.OPENAI_API_KEY = "mock_key"
+            mock_settings.AZURE_OPENAI_API_KEY = None
+            mock_settings.AZURE_OPENAI_ENDPOINT = None
             mock_settings.LLM_MODEL = "gpt-4o-mini"
+            mock_settings.HEALTH_LLM_PROBE_ENABLED = False
 
             response = await health_check_llm()
-            # LLM check is currently mocked/disabled, so it should always return healthy
-            assert response["status"] == "llm healthy"
-            assert "duration" in response
-            assert response["model"] == "gpt-4o-mini"
+            payload = _body(response)
+            assert response.status_code == 200
+            assert payload["status"] == "configured"
+            assert payload["probe"] == "not_performed"
+            assert payload["model"] == "gpt-4o-mini"
+            assert "duration" in payload
 
     @pytest.mark.asyncio
     async def test_health_check_llm_no_api_key(self):
         """Test LLM health check with no API key"""
         with patch("app.api.v1.health.settings") as mock_settings:
             mock_settings.OPENAI_API_KEY = None
+            mock_settings.AZURE_OPENAI_API_KEY = None
+            mock_settings.AZURE_OPENAI_ENDPOINT = None
+            mock_settings.LLM_MODEL = "gpt-4o-mini"
+            mock_settings.HEALTH_LLM_PROBE_ENABLED = False
             response = await health_check_llm()
-            # Since actual LLM call is commented out, it returns
-            # healthy even without API key
-            assert response["status"] == "llm healthy"
+            payload = _body(response)
+            assert response.status_code == 200
+            assert payload["status"] == "not_configured"
+            assert payload["probe"] == "not_performed"
 
     @pytest.mark.asyncio
     async def test_health_check_vector_store_success(self):
         """Test vector store health check success"""
         with (
-            patch("app.core.weaviate_client.get_weaviate_client") as mock_get_client,
+            patch("app.api.v1.health.get_weaviate_client") as mock_get_client,
             patch("app.api.v1.health.settings") as mock_settings,
             patch("app.api.v1.health.perf_counter", side_effect=[0, 0.1]),
         ):
@@ -125,15 +149,17 @@ class TestHealthService:
             mock_settings.WEAVIATE_URL = "http://mock-weaviate:8080"
 
             response = await health_check_vector_store()
-            assert response["status"] == "vector store healthy"
-            assert "duration" in response
-            assert response["service"] == "weaviate"
+            payload = _body(response)
+            assert response.status_code == 200
+            assert payload["status"] == "vector store healthy"
+            assert "duration" in payload
+            assert payload["service"] == "weaviate"
 
     @pytest.mark.asyncio
     async def test_health_check_vector_store_unhealthy(self):
         """Test vector store health check unhealthy"""
         with (
-            patch("app.core.weaviate_client.get_weaviate_client") as mock_get_client,
+            patch("app.api.v1.health.get_weaviate_client") as mock_get_client,
             patch("app.api.v1.health.perf_counter", side_effect=[0, 0.1]),
         ):
             mock_client = MagicMock()
@@ -141,19 +167,19 @@ class TestHealthService:
             mock_get_client.return_value = mock_client
 
             response = await health_check_vector_store()
-            assert response["status"] == "vector store unhealthy"
-            assert "Weaviate not ready" in response["error"]
+            payload = _body(response)
+            assert response.status_code == 503
+            assert payload["status"] == "vector store unhealthy"
+            assert payload["error"] == PUBLIC_VECTOR_UNAVAILABLE
 
     def test_health_endpoints_integration(self):
         """Test health endpoints via FastAPI client"""
         client = TestClient(app)
 
-        # Test root health endpoint
         response = client.get("/api/v1/health/")
         assert response.status_code == 200
         assert response.json() == {"status": "ok"}
 
-        # Test comprehensive health check (redirects to /api/v1/health/)
         response = client.get("/api/v1/health", follow_redirects=False)
         assert response.status_code == 307  # Redirect
 
@@ -176,12 +202,18 @@ class TestHealthService:
         data = response.json()
         assert "status" in data
         assert "duration" in data
+        assert data["probe"] == "not_performed"
 
     def test_health_check_vector_store_endpoint(self):
         """Test vector store health check endpoint"""
         client = TestClient(app)
 
-        response = client.get("/api/v1/health/vector-store")
+        with patch("app.api.v1.health.get_weaviate_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.health_check.return_value = True
+            mock_get_client.return_value = mock_client
+            response = client.get("/api/v1/health/vector-store")
+
         assert response.status_code == 200
         data = response.json()
         assert "status" in data

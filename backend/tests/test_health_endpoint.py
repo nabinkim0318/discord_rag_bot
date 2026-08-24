@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -12,8 +12,6 @@ def test_health_root():
         assert resp.status_code == 200
         data = resp.json()
         assert "status" in data or isinstance(data, dict)
-        # Duration may not be present in all health responses
-        # assert "duration" in data
 
 
 def test_health_db():
@@ -32,10 +30,17 @@ def test_health_llm():
         data = resp.json()
         assert "status" in data
         assert "duration" in data
+        assert data["probe"] == "not_performed"
 
 
 def test_health_vector_store():
-    with TestClient(app) as client:
+    with (
+        patch("app.api.v1.health.get_weaviate_client") as mock_get_client,
+        TestClient(app) as client,
+    ):
+        mock_client = MagicMock()
+        mock_client.health_check.return_value = True
+        mock_get_client.return_value = mock_client
         resp = client.get("/api/v1/health/vector-store")
         assert resp.status_code == 200
         data = resp.json()
