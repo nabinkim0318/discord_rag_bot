@@ -583,13 +583,16 @@ async def get_backend_text(url: str, timeout: float = 10.0) -> str:
         return r.text
 
 
-async def get_backend_json(url: str, timeout: float = 10.0) -> dict:
+async def get_backend_json(
+    url: str, timeout: float = 10.0, *, raise_for_status: bool = True
+) -> dict:
     async with httpx.AsyncClient(
         timeout=timeout,
         limits=limits,
     ) as client:
         r = await client.get(url, headers={"User-Agent": "discord-rag-bot/1.0"})
-        r.raise_for_status()
+        if raise_for_status:
+            r.raise_for_status()
         return r.json()
 
 
@@ -652,9 +655,15 @@ async def config(ctx: SlashContext):
     try:
         # health checks
         h_core = await get_backend_json(f"{BACKEND_BASE}/api/v1/health/")
-        h_db = await get_backend_json(f"{BACKEND_BASE}/api/v1/health/db")
-        h_llm = await get_backend_json(f"{BACKEND_BASE}/api/v1/health/llm")
-        h_vec = await get_backend_json(f"{BACKEND_BASE}/api/v1/health/vector-store")
+        h_db = await get_backend_json(
+            f"{BACKEND_BASE}/api/v1/health/db", raise_for_status=False
+        )
+        h_llm = await get_backend_json(
+            f"{BACKEND_BASE}/api/v1/health/llm", raise_for_status=False
+        )
+        h_vec = await get_backend_json(
+            f"{BACKEND_BASE}/api/v1/health/vector-store", raise_for_status=False
+        )
 
         # data sources (priority: ENV → None)
         sources_env = os.environ.get("DATA_SOURCES", "")

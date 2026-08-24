@@ -52,9 +52,21 @@ class Settings:
 
     # ==================== Weaviate Settings ====================
     WEAVIATE_URL: str = os.getenv("WEAVIATE_URL", "http://weaviate:8080")
-    WEAVIATE_API_KEY: Optional[str] = os.getenv("WEAVIATE_API_KEY")
+    # Local Compose disables anonymous access and shares this development key.
+    # Override via WEAVIATE_API_KEY. Not production-safe.
+    WEAVIATE_API_KEY: Optional[str] = (
+        os.getenv("WEAVIATE_API_KEY") or "local-dev-weaviate-api-key"
+    )
     WEAVIATE_CLASS_NAME: str = os.getenv("WEAVIATE_CLASS_NAME", "KBChunk")
     WEAVIATE_BATCH_SIZE: int = int(os.getenv("WEAVIATE_BATCH_SIZE", "100"))
+
+    # ==================== Health Probe Settings ====================
+    HEALTH_LLM_PROBE_ENABLED: bool = (
+        os.getenv("HEALTH_LLM_PROBE_ENABLED", "false").lower() == "true"
+    )
+    HEALTH_LLM_PROBE_TIMEOUT_SECONDS: float = float(
+        os.getenv("HEALTH_LLM_PROBE_TIMEOUT_SECONDS", "3")
+    )
 
     # ==================== Database Settings ====================
     DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL")

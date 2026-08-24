@@ -15,6 +15,9 @@ if not _existing_url.startswith("postgresql"):
     _test_db.unlink(missing_ok=True)
     os.environ["DATABASE_URL"] = f"sqlite:///{_test_db}"
 
+# Never perform a live paid LLM probe during the backend test suite.
+os.environ["HEALTH_LLM_PROBE_ENABLED"] = "false"
+
 # Add backend directory to Python path for imports
 backend_dir = Path(__file__).parent
 if str(backend_dir) not in sys.path:

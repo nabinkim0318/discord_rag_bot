@@ -18,33 +18,49 @@ from app.core.logging import logger
 from app.core.retry import retry_weaviate
 
 
+def create_configured_weaviate_client():
+    """Build a v3 client from application settings (URL + optional API key)."""
+    if weaviate is None:
+        raise RuntimeError("weaviate is not installed")
+
+    auth_client_secret = None
+    if settings.WEAVIATE_API_KEY:
+        auth_client_secret = weaviate.AuthApiKey(api_key=settings.WEAVIATE_API_KEY)
+
+    return weaviate.Client(
+        url=settings.WEAVIATE_URL,
+        auth_client_secret=auth_client_secret,
+    )
+
+
 class WeaviateClient:
     """Weaviate client for vector operations"""
 
-    def __init__(self):
+    def __init__(self, *, setup_schema: bool = True, require_ready: bool = True):
         self.client = None
         self.class_name = settings.WEAVIATE_CLASS_NAME
-        self._connect()
+        self._connect(setup_schema=setup_schema, require_ready=require_ready)
 
-    def _connect(self):
-        """Connect to Weaviate using v3 client (stable)"""
+    def _connect(self, setup_schema: bool = True, require_ready: bool = True):
+        """Connect to Weaviate using the same settings as application access."""
         try:
-            # v3 client
-            self.client = weaviate.Client(
-                url=settings.WEAVIATE_URL,
-                auth_client_secret=(
-                    weaviate.AuthApiKey(api_key=settings.WEAVIATE_API_KEY)
-                    if settings.WEAVIATE_API_KEY
-                    else None
-                ),
-            )
-            if self.client.is_ready():
+            self.client = create_configured_weaviate_client()
+            try:
+                ready = bool(self.client.is_ready())
+            except Exception as exc:
+                logger.error(f"Weaviate readiness check failed: {str(exc)}")
+                ready = False
+
+            if ready:
                 logger.info(f"Connected to Weaviate at {settings.WEAVIATE_URL}")
-                self._setup_schema()
-            else:
+                if setup_schema:
+                    self._setup_schema()
+            elif require_ready:
                 raise ExternalServiceException(
                     "Weaviate connection failed", service_name="weaviate"
                 )
+        except ExternalServiceException:
+            raise
         except Exception as e:
             logger.error(f"Failed to connect to Weaviate: {str(e)}")
             raise ExternalServiceException(
@@ -241,13 +257,10 @@ class WeaviateClient:
 weaviate_client = None
 
 
-def get_weaviate_client() -> Any:
-    """Return a Weaviate client if available; tests patch this symbol.
+def get_weaviate_client() -> WeaviateClient:
+    """Return a configured Weaviate client used by application and health paths.
 
-    In production this would build a configured client. Here we keep it minimal
-    so unit tests can patch it via `app.core.weaviate_client.get_weaviate_client`.
+    Uses settings.WEAVIATE_URL and settings.WEAVIATE_API_KEY. Tests patch this
+    symbol via `app.core.weaviate_client.get_weaviate_client`.
     """
-    if weaviate is None:
-        raise RuntimeError("weaviate is not installed")
-    # NOTE: Minimal client; real config can be added as needed
-    return weaviate.Client("http://weaviate:8080")
+    return WeaviateClient(setup_schema=False, require_ready=False)
