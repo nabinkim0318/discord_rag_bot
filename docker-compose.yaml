@@ -82,6 +82,9 @@ services:
       start_period: 60s
 
   # ==================== Discord Bot ====================
+  # Optional: `docker compose --profile discord up`.
+  # Prometheus does not scrape the optional bot exporter unless the Discord
+  # overlay is also applied: -f docker-compose.yaml -f docker-compose.discord.yaml
   bot:
     build:
       context: ./bots
@@ -135,6 +138,9 @@ services:
       - "127.0.0.1:9090:9090"
     volumes:
       - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # Default extra scrape dir is empty. Discord bot scrape is added only
+      # via docker-compose.discord.yaml (Compose profile "discord").
+      - ./ops/prometheus/scrape.d:/etc/prometheus/scrape.d:ro
       - prometheus_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"

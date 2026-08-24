@@ -1,4 +1,4 @@
-name: Main CI/CD Pipeline
+name: Main CI Pipeline
 
 on:
   push:
@@ -41,7 +41,6 @@ jobs:
         run: |
           poetry run isort --check-only --profile black --line-length 88 .
           poetry run ruff check --line-length 88 .
-          poetry run ruff format .
           poetry run ruff format --check .
 
       - name: Run Tests (Backend)
@@ -81,7 +80,6 @@ jobs:
         run: |
           poetry run isort --check-only --profile black --line-length 88 .
           poetry run ruff check --line-length 88 .
-          poetry run ruff format .
           poetry run ruff format --check .
 
       - name: Run Tests (RAG Agent)
@@ -113,12 +111,12 @@ jobs:
       - name: Run Prettier & Lint (Frontend)
         run: |
           npx prettier --check .
-          npx eslint . --ext .js,.ts,.tsx || true  # optional: remove '|| true' to fail on lint errors
+          npm run lint
 
       - name: Run Tests (Frontend)
-        run: npm run test --if-present # if you add frontend tests later
+        run: npm run test --if-present
 
-  # Job 4: Docker Build (depends on backend and rag_agent)
+  # Job 4: Docker image build validation (push: false; not a delivery/CD stage)
   docker-build:
     name: Docker Build
     runs-on: ubuntu-latest
@@ -170,9 +168,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Job 5: Security Scan (runs in parallel with other jobs)
+  # Job 5: Backend Bandit — full report is informational; high/high is a blocking gate.
+  # Policy: scan backend/app only (not rag_agent or bots), keep the complete JSON
+  # artifact, and fail the job on HIGH severity + HIGH confidence findings.
   security-scan:
-    name: Security Scan
+    name: Backend Security Scan (Bandit high/high)
     runs-on: ubuntu-latest
 
     steps:
@@ -195,10 +195,15 @@ jobs:
         run: |
           poetry install --no-interaction --no-ansi
 
-      - name: Run security scan
+      - name: Write complete Bandit report (informational artifact)
         working-directory: ./backend
         run: |
-          poetry run bandit -r . -f json -o bandit-report.json || true
+          poetry run bandit -r app -f json -o bandit-report.json --exit-zero
+
+      - name: Enforce Bandit high-severity/high-confidence gate
+        working-directory: ./backend
+        run: |
+          poetry run bandit -r app --severity-level high --confidence-level high
 
       - name: Upload security report
         uses: actions/upload-artifact@v4
@@ -208,7 +213,7 @@ jobs:
           path: backend/bandit-report.json
           retention-days: 30
 
-  # Job 6: Final Integration Check (depends on all previous jobs)
+  # Job 6: Final Integration Check (depends on all previous blocking jobs)
   integration-check:
     name: Integration Check
     runs-on: ubuntu-latest
@@ -217,9 +222,9 @@ jobs:
     steps:
       - name: All checks passed
         run: |
-          echo "✅ All CI/CD checks passed successfully!"
-          echo "✅ Backend tests and linting: PASSED"
-          echo "✅ RAG Agent tests and linting: PASSED"
-          echo "✅ Frontend tests and linting: PASSED"
-          echo "✅ Docker builds: PASSED"
-          echo "✅ Security scan: PASSED"
+          echo "All CI checks passed successfully!"
+          echo "Backend tests and linting: PASSED"
+          echo "RAG Agent tests and linting: PASSED"
+          echo "Frontend tests, Prettier, and ESLint: PASSED"
+          echo "Docker image build validation: PASSED"
+          echo "Backend Bandit high-severity/high-confidence gate: PASSED"

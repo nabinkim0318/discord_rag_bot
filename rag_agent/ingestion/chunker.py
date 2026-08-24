@@ -280,9 +280,9 @@ def validate_chunk_data(chunks: List[Chunk], original_text: str) -> Dict[str, An
 
         try:
             original_slice = original_text[start_char:end_char]
-            assert (
-                chunk.text.strip() == original_slice.strip()
-            ), f"Chunk {i}: text mismatch at offset {start_char}:{end_char}"
+            assert chunk.text.strip() == original_slice.strip(), (
+                f"Chunk {i}: text mismatch at offset {start_char}:{end_char}"
+            )
         except (AssertionError, IndexError) as e:
             validation_results["offset_integrity_passed"] = False
             validation_results["errors"].append(

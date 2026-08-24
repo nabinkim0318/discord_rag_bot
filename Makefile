@@ -65,6 +65,7 @@ lint-rag:
 
 lint-frontend:
 	cd frontend && npm run format:check
+	cd frontend && npm run lint
 
 format: format-backend format-rag format-frontend format-all
 
@@ -106,7 +107,7 @@ format-all:
 	$(MAKE) format-backend
 	$(MAKE) format-rag
 
-# 🔍 Formatting check (for CI/CD)
+# 🔍 Formatting check (for CI)
 format-check: format-check-backend format-check-rag format-check-frontend
 
 format-check-backend:
@@ -212,7 +213,7 @@ docker-up:
 	docker compose up -d
 
 docker-up-with-bot:
-	docker compose --profile discord up -d
+	docker compose --profile discord -f docker-compose.yaml -f docker-compose.discord.yaml up -d
 
 docker-down:
 	docker compose down

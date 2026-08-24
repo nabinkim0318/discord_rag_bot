@@ -55,16 +55,16 @@ def test_query_planner_logic():
             # Test actual logic execution
             assert hasattr(result, "original_query"), "Should have original_query"
             assert hasattr(result, "intents"), "Should have intents"
-            assert hasattr(
-                result, "requires_clarification"
-            ), "Should have requires_clarification"
+            assert hasattr(result, "requires_clarification"), (
+                "Should have requires_clarification"
+            )
 
             # Test intent detection logic
             intent_types = [intent.intent for intent in result.intents]
             for expected_intent in case["expected_intents"]:
-                assert (
-                    expected_intent in intent_types
-                ), f"Expected {expected_intent} in {intent_types} for '{case['query']}'"
+                assert expected_intent in intent_types, (
+                    f"Expected {expected_intent} in {intent_types} for '{case['query']}'"
+                )
 
             logger.info(f"✅ {case['description']}: {intent_types}")
 
@@ -110,12 +110,12 @@ def test_chunking_logic():
         )
 
         assert len(chunks) > 0, "Should produce chunks"
-        assert all(
-            hasattr(chunk, "text") for chunk in chunks
-        ), "All chunks should have text"
-        assert all(
-            hasattr(chunk, "meta") for chunk in chunks
-        ), "All chunks should have meta"
+        assert all(hasattr(chunk, "text") for chunk in chunks), (
+            "All chunks should have text"
+        )
+        assert all(hasattr(chunk, "meta") for chunk in chunks), (
+            "All chunks should have meta"
+        )
 
         # Test chunk properties
         for chunk in chunks:
@@ -128,15 +128,15 @@ def test_chunking_logic():
         enhanced_chunks = chunk_document(sample_text, "test.pdf", page=1)
 
         assert len(enhanced_chunks) > 0, "Should produce enhanced chunks"
-        assert all(
-            hasattr(chunk, "content") for chunk in enhanced_chunks
-        ), "All chunks should have content"
-        assert all(
-            hasattr(chunk, "metadata") for chunk in enhanced_chunks
-        ), "All chunks should have metadata"
-        assert all(
-            hasattr(chunk, "chunk_id") for chunk in enhanced_chunks
-        ), "All chunks should have chunk_id"
+        assert all(hasattr(chunk, "content") for chunk in enhanced_chunks), (
+            "All chunks should have content"
+        )
+        assert all(hasattr(chunk, "metadata") for chunk in enhanced_chunks), (
+            "All chunks should have metadata"
+        )
+        assert all(hasattr(chunk, "chunk_id") for chunk in enhanced_chunks), (
+            "All chunks should have chunk_id"
+        )
 
         logger.info("✅ Chunking logic test passed")
         return True
@@ -185,15 +185,15 @@ def test_text_normalization_logic():
 
             if "expected_not_contains" in case:
                 for item in case["expected_not_contains"]:
-                    assert (
-                        item not in result
-                    ), f"Should not contain '{item}' after normalization"
+                    assert item not in result, (
+                        f"Should not contain '{item}' after normalization"
+                    )
 
             if "expected_contains" in case:
                 for item in case["expected_contains"]:
-                    assert (
-                        item in result
-                    ), f"Should contain '{item}' after normalization"
+                    assert item in result, (
+                        f"Should contain '{item}' after normalization"
+                    )
 
             logger.info(f"✅ {case['description']}: {len(result)} chars")
 
@@ -254,9 +254,9 @@ def test_fusion_logic():
 
         # Test diversity (MMR should select diverse items)
         selected_uids = [item["chunk_uid"] for item in mmr_result]
-        assert len(set(selected_uids)) == len(
-            selected_uids
-        ), "Should select unique items"
+        assert len(set(selected_uids)) == len(selected_uids), (
+            "Should select unique items"
+        )
 
         logger.info("✅ Fusion logic test passed")
         return True
@@ -286,9 +286,9 @@ def test_metadata_extraction_logic():
         for text, expected in audience_cases:
             result = chunker._extract_audience(text)
             assert isinstance(result, str), "Should return string"
-            assert (
-                result == expected
-            ), f"Expected '{expected}', got '{result}' for '{text}'"
+            assert result == expected, (
+                f"Expected '{expected}', got '{result}' for '{text}'"
+            )
 
         # Test real week extraction logic
         week_cases = [
@@ -300,9 +300,9 @@ def test_metadata_extraction_logic():
         for text, expected in week_cases:
             result = chunker._extract_week(text)
             if expected:
-                assert (
-                    result == expected
-                ), f"Expected week {expected}, got {result} for '{text}'"
+                assert result == expected, (
+                    f"Expected week {expected}, got {result} for '{text}'"
+                )
             else:
                 assert result is None, f"Expected None, got {result} for '{text}'"
 
@@ -315,14 +315,14 @@ def test_metadata_extraction_logic():
 
         for text, expected_count in link_cases:
             result = chunker._extract_links(text)
-            assert (
-                len(result) == expected_count
-            ), f"Expected {expected_count} links, got {len(result)} for '{text}'"
+            assert len(result) == expected_count, (
+                f"Expected {expected_count} links, got {len(result)} for '{text}'"
+            )
             if result:
                 assert all("url" in link for link in result), "Should have url field"
-                assert all(
-                    "title" in link for link in result
-                ), "Should have title field"
+                assert all("title" in link for link in result), (
+                    "Should have title field"
+                )
 
         logger.info("✅ Metadata extraction logic test passed")
         return True
@@ -366,9 +366,9 @@ def test_retrieval_logic_with_mocked_externals():
             # Test BM25 search logic
             bm25_results = bm25_search("dummy_db", "machine learning", k=2)
             assert len(bm25_results) <= 2, "Should return at most k results"
-            assert all(
-                "score_bm25" in result for result in bm25_results
-            ), "Should have BM25 scores"
+            assert all("score_bm25" in result for result in bm25_results), (
+                "Should have BM25 scores"
+            )
 
         logger.info("✅ Retrieval logic test passed")
         return True

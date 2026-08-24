@@ -36,9 +36,9 @@ def test_query_planner_real():
             result = planner.plan_query(query)
             assert hasattr(result, "original_query"), "Should have original_query"
             assert hasattr(result, "intents"), "Should have intents"
-            assert hasattr(
-                result, "requires_clarification"
-            ), "Should have requires_clarification"
+            assert hasattr(result, "requires_clarification"), (
+                "Should have requires_clarification"
+            )
 
         logger.info("✅ QueryPlanner real test passed")
         return True
@@ -70,12 +70,12 @@ def test_enhanced_chunker_real():
         chunks = chunker.chunk_text(test_content, source="test.md")
 
         assert len(chunks) > 0, "Should produce chunks"
-        assert all(
-            hasattr(chunk, "content") for chunk in chunks
-        ), "All chunks should have content"
-        assert all(
-            hasattr(chunk, "metadata") for chunk in chunks
-        ), "All chunks should have metadata"
+        assert all(hasattr(chunk, "content") for chunk in chunks), (
+            "All chunks should have content"
+        )
+        assert all(hasattr(chunk, "metadata") for chunk in chunks), (
+            "All chunks should have metadata"
+        )
 
         logger.info("✅ EnhancedChunker real test passed")
         return True
